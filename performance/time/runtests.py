@@ -9,15 +9,13 @@ import statistics
 
 IDRIS2 = "idris2"
 SAMPLES = 5
-ITERATIONS = 1000
 PATH_TO_CHARTS = "charts/"
 RESULTS_FILE = "results.txt"
 
-NAME = "name"
-ITR = "iterations"
-TYRE_FILE = "tyreFile"
-COMB_FILE = "combFile"
-XLABEL = "xlabel"
+ITARATIONS = 1000
+STEP = 10
+
+INPUTS = []
 
 def add(x, y):
     return x + y
@@ -38,81 +36,77 @@ def exec(name, i):
                             universal_newlines=True,
                             stdout=subprocess.PIPE)
     start = time.time()
-    out = ssh.communicate(input=str(i))[0]
+    out = ssh.communicate(input=INPUTS[i])[0]
     end = time.time()
     return (end - start)
 
 def measuretime(name, iterations):
-    times = []
     exec(name.lower(), 0)
+    # times = [exec(name.lower(), 0)]
+    times = []
     for i in range(iterations):
         times.append(exec(name.lower(), i))
     return times
 
 def buildTimes(name, iterations):
     os.system(IDRIS2 + " -p tyre -p contrib " + name + ".idr -o " + name.lower())
-    print(f"{name} ({SAMPLES} samples)", end="", flush=True)
+    print(name, end=" ", flush=True)
 
     timesMatrix = []
     for i in range(SAMPLES):
         print(".", end="", flush=True)
         times = measuretime(name, iterations)
-        with open(RESULTS_FILE, 'a') as f:
-            f.write(name + "-" + str(i) + " : " + str(times) + "\n")
         timesMatrix.append(times)
     avg = []
     stddev = []
     for i in range(iterations):
         current = []
         for j in range(SAMPLES):
-            current.append(timesMatrix[j][i])
+          current.append(timesMatrix[j][i])
         avg.append(statistics.mean(current))
         stddev.append(statistics.stdev(current))
     print(" done")
     return {"avg":avg, "stdev":stddev}
 
-def runtest(test):
-    result = {
-        "tyretimes": buildTimes(test[TYRE_FILE], test[ITR]),
-        "combtimes": buildTimes(test[COMB_FILE], test[ITR])
-        }
-    return result
+def runtest():
+  global INPUTS
+  for i in range(ITARATIONS):
+    INPUTS.append("12:42" * (i * STEP))
 
-def plotresult(test, testresult):
-    tyretimes = testresult["tyretimes"]
-    combtimes = testresult["combtimes"]
-    x = range(1, test[ITR]+1)
-    plt.plot(x, tyretimes["avg"], color='blue', label='TyRE')
+  return {
+    "auto_extract": buildTimes("TimeAutoExtract", ITARATIONS),
+    "manual_extract": buildTimes("TimeManualExtract", ITARATIONS),
+    "match": buildTimes("TimeMatch", ITARATIONS),
+  }
+
+def plotresult(testresult):
+    auto_extract = testresult["auto_extract"]
+    manual_extract = testresult["manual_extract"]
+    match = testresult["match"]
+    x = range(0, ITARATIONS * STEP, STEP)
+    plt.plot(x, auto_extract["avg"], color='blue', label='automatic extraction')
     plt.fill_between(x,
-        listOpByIndex(tyretimes["avg"], tyretimes["stdev"], subtract),
-        listOpByIndex(tyretimes["avg"], tyretimes["stdev"], add),
+        listOpByIndex(auto_extract["avg"], auto_extract["stdev"], subtract),
+        listOpByIndex(auto_extract["avg"], auto_extract["stdev"], add),
         color='blue', alpha=0.2)
-    plt.plot(x, combtimes["avg"], color='orange', label='parser combinators')
+    plt.plot(x, manual_extract["avg"], color='orange', label='manual extraction')
     plt.fill_between(x,
-        listOpByIndex(combtimes["avg"], combtimes["stdev"], subtract),
-        listOpByIndex(combtimes["avg"], combtimes["stdev"], add),
+        listOpByIndex(manual_extract["avg"], manual_extract["stdev"], subtract),
+        listOpByIndex(manual_extract["avg"], manual_extract["stdev"], add),
         color='orange', alpha=0.3)
+    plt.plot(x, match["avg"], color='green', label='match only')
+    plt.fill_between(x,
+        listOpByIndex(match["avg"], match["stdev"], subtract),
+        listOpByIndex(match["avg"], match["stdev"], add),
+        color='green', alpha=0.2)
     plt.ylabel('time in seconds')
-    plt.xlabel(test[XLABEL])
+    plt.xlabel("no. dates")
     plt.legend(loc="upper left")
-    plt.savefig(PATH_TO_CHARTS + test[NAME] + ".png")
+    plt.savefig(PATH_TO_CHARTS + "time.png")
     plt.clf()
 
-tests = [
-    {NAME : "star", ITR : ITERATIONS, TYRE_FILE: "StarTyRE",
-        COMB_FILE: "StarComb", XLABEL: "length of word"},
-    {NAME : "star2", ITR : ITERATIONS, TYRE_FILE: "StarTyRE2",
-        COMB_FILE: "StarComb2", XLABEL: "length of word"},
-    {NAME : "concat", ITR : ITERATIONS, TYRE_FILE: "ConcatTyRE",
-        COMB_FILE: "ConcatComb", XLABEL: "length of regex and word"} ,
-    {NAME : "alternation", ITR : ITERATIONS, TYRE_FILE: "AltTyRE",
-        COMB_FILE: "AltComb", XLABEL: "length of regex"}
-]
-
 def runall():
-    for t in tests:
-        print("Running test", t[NAME])
-        plotresult(t, runtest(t))
+    plotresult(runtest())
 
 def setIdris(name):
     global IDRIS2

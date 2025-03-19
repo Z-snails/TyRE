@@ -12,7 +12,8 @@ SAMPLES = 5
 PATH_TO_CHARTS = "charts/"
 RESULTS_FILE = "results.txt"
 
-ITARATIONS = 1000
+ITERATIONS = 1000
+STEP = 5
 
 def add(x, y):
     return x + y
@@ -31,23 +32,28 @@ def exec(name, i):
     ssh = subprocess.Popen(["./build/exec/" + name],
                             stdin=subprocess.PIPE,
                             universal_newlines=True,
-                            stdout=subprocess.PIPE)
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE)
     start = time.time()
-    out = ssh.communicate(input=str(i))[0]
+    out, err = ssh.communicate(input=str(i))
     end = time.time()
     return (end - start)
 
 def measuretime(name, iterations):
-    os.system(IDRIS2 + " -p tyre -p contrib " + name + ".idr -o " + name.lower())
-    exec(name.lower(), 0)
-    times = [exec(name.lower(), 0)]
+    # exec(name.lower(), 0)
+    # times = [exec(name.lower(), 0)]
+    times = []
     for i in range(iterations):
-        times.append(exec(name.lower(), i))
+        times.append(exec(name.lower(), i * STEP))
     return times
 
 def buildTimes(name, iterations):
+    print(f"{name} ({SAMPLES} samples)", end="", flush=True)
+    os.system(IDRIS2 + " -p tyre -p contrib " + name + ".idr -o " + name.lower())
+
     timesMatrix = []
     for i in range(SAMPLES):
+        print(".", end="", flush=True)
         times = measuretime(name, iterations)
         timesMatrix.append(times)
     avg = []
@@ -58,42 +64,57 @@ def buildTimes(name, iterations):
           current.append(timesMatrix[j][i])
         avg.append(statistics.mean(current))
         stddev.append(statistics.stdev(current))
+
+    print(" done", flush=True)
     return {"avg":avg, "stdev":stddev}
 
 def runtest():
   return {
-    "balanced": buildTimes("AltBalanced", ITARATIONS),
-    "unbalanced": buildTimes("AltUnbalanced", ITARATIONS),
-    "balancedGroup": buildTimes("AltBalancedGroup", ITARATIONS),
-    "unbalancedGroup": buildTimes("AltUnbalancedGroup", ITARATIONS),
+    "comb": buildTimes("AltComb", ITERATIONS),
+    "balanced": buildTimes("AltBalanced", ITERATIONS),
+    "unbalanced": buildTimes("AltUnbalanced", ITERATIONS),
+    "balancedGroup": buildTimes("AltBalancedGroup", ITERATIONS),
+    "unbalancedGroup": buildTimes("AltUnbalancedGroup", ITERATIONS),
   }
 
 def plotresult(testresult):
+    comb = testresult["comb"]
     balanced = testresult["balanced"]
     unbalanced = testresult["unbalanced"]
     balancedGroup = testresult["balancedGroup"]
     unbalancedGroup = testresult["unbalancedGroup"]
-    x = range(ITARATIONS)
-    plt.plot(x, balanced["avg"], color='blue', label='balanced')
+    x = range(0, ITERATIONS * STEP, STEP)
+
+    plt.plot(x, comb["avg"], color='orange', label='parse combinators')
     plt.fill_between(x,
-        listOpByIndex(balanced["avg"], balanced["stdev"], subtract),
-        listOpByIndex(balanced["avg"], balanced["stdev"], add),
-        color='blue', alpha=0.2)
-    plt.plot(x, unbalanced["avg"], color='orange', label='unbalanced')
+        listOpByIndex(comb["avg"], comb["stdev"], subtract),
+        listOpByIndex(comb["avg"], comb["stdev"], add),
+        color='orange', alpha=0.2)
+
+    plt.plot(x, unbalanced["avg"], color='blue', label='unbalanced')
     plt.fill_between(x,
         listOpByIndex(unbalanced["avg"], unbalanced["stdev"], subtract),
         listOpByIndex(unbalanced["avg"], unbalanced["stdev"], add),
-        color='orange', alpha=0.3)
-    plt.plot(x, balancedGroup["avg"], color='green', label='balanced group')
+        color='blue', alpha=0.2)
+
+    plt.plot(x, balanced["avg"], color='pink', label='balanced')
     plt.fill_between(x,
-        listOpByIndex(balancedGroup["avg"], balancedGroup["stdev"], subtract),
-        listOpByIndex(balancedGroup["avg"], balancedGroup["stdev"], add),
-        color='green', alpha=0.2)
+        listOpByIndex(balanced["avg"], balanced["stdev"], subtract),
+        listOpByIndex(balanced["avg"], balanced["stdev"], add),
+        color='pink', alpha=0.2)
+
     plt.plot(x, unbalancedGroup["avg"], color='red', label='unbalanced group')
     plt.fill_between(x,
         listOpByIndex(unbalancedGroup["avg"], unbalancedGroup["stdev"], subtract),
         listOpByIndex(unbalancedGroup["avg"], unbalancedGroup["stdev"], add),
         color='red', alpha=0.2)
+
+    plt.plot(x, balancedGroup["avg"], color='green', label='balanced group')
+    plt.fill_between(x,
+        listOpByIndex(balancedGroup["avg"], balancedGroup["stdev"], subtract),
+        listOpByIndex(balancedGroup["avg"], balancedGroup["stdev"], add),
+        color='green', alpha=0.2)
+
     plt.ylabel('time in seconds')
     plt.xlabel("alt group")
     plt.legend(loc="upper left")
