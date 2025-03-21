@@ -33,25 +33,26 @@ replaceEndInInit xs mks =
 replaceEndInNext : List (Nat, NextStates) -> List (Maybe Nat)
                 -> List (Nat, NextStates)
 replaceEndInNext [] mks = []
-replaceEndInNext ((n, (MkNextStates condition isSat)) :: xs) mks = 
+replaceEndInNext ((n, (MkNextStates condition isSat)) :: xs) mks =
   (n, (MkNextStates condition (replaceEndInInit isSat mks))) :: (replaceEndInNext xs mks)
 
+public export
 groupStates : Nat -> TyRE a -> GroupSM
-groupStates n (MatchChar cond) = 
+groupStates n (MatchChar cond) =
   MkGroupSM [Just n] [(n, MkNextStates cond [Nothing])] (n+1)
 groupStates n (Group re) = groupStates n re
 groupStates n Empty =  MkGroupSM [Nothing] [] n
-groupStates n (re1 <*> re2) = 
+groupStates n (re1 <*> re2) =
   let (MkGroupSM init1 sWN1 n1) := groupStates n re1
       (MkGroupSM init2 sWN2 n2) := groupStates n1 re2
   in MkGroupSM  (replaceEndInInit init1 init2)
-                ((replaceEndInNext sWN1 init2)  ++ sWN2)  
+                ((replaceEndInNext sWN1 init2)  ++ sWN2)
                 n2
 groupStates n (re1 <|> re2) =
   let (MkGroupSM init1 sWN1 n1) := groupStates n re1
       (MkGroupSM init2 sWN2 n2) := groupStates n1 re2
   in MkGroupSM (init1 ++ init2) (sWN1 ++ sWN2) n2
-groupStates n (Rep re) = 
+groupStates n (Rep re) =
   let (MkGroupSM init sWN n') := groupStates n re
   in MkGroupSM (Nothing :: init) (replaceEndInNext sWN (Nothing :: init)) n'
 groupStates n (Conv re f) = groupStates n re
@@ -65,35 +66,35 @@ min (MkGroupSM initStates statesWithNext max) =
   in MkGroupSM initStates' statesWithNext' max where
   go : Nat -> (List (Maybe Nat), List (Nat, NextStates)) -> (List (Maybe Nat), List (Nat, NextStates))
   go 0 xs = xs
-  go (S k) (init, xs) = 
+  go (S k) (init, xs) =
     let mappings := getMappings (group xs)
     in if (length mappings == 0) then (init, xs) else go k (squash mappings (init, xs)) where
     group : List (Nat, NextStates) -> List (List1 (Nat, NextStates))
     group xs = groupBy stateEq xs where
       stateEq : (Nat, NextStates) -> (Nat, NextStates) -> Bool
-      stateEq (_, (MkNextStates cond  isSat )) 
+      stateEq (_, (MkNextStates cond  isSat ))
               (_, (MkNextStates cond' isSat')) =
                 cond == cond' && (eq isSat isSat')
     getMappings : List (List1 (Nat, NextStates)) -> List (Nat, Nat)
     getMappings [] = []
     getMappings (((nh, _) ::: xs) :: ys) = (map (\case (x, _) => (nh, x)) xs) ++ getMappings ys
     applyFilter : (Nat, Nat) -> List (Maybe Nat) -> List (Maybe Nat)
-    applyFilter (n, n1) xs = 
+    applyFilter (n, n1) xs =
       case (find (== Just n1) xs) of
         Nothing => xs
         (Just y) => (Just n) :: filter (\x => not (x == Just n || x == Just n1)) xs
     squash : List (Nat, Nat) -> (List (Maybe Nat), List (Nat, NextStates)) -> (List (Maybe Nat), List (Nat, NextStates))
     squash [] x = x
-    squash ((n, n1) :: xs) (init, ys) = 
-      squash xs 
+    squash ((n, n1) :: xs) (init, ys) =
+      squash xs
             ( filter (\x => x /= (Just n1)) init
             , applyMap ys) where
             applyMap : List (Nat, NextStates) -> List (Nat, NextStates)
             applyMap [] = []
-            applyMap ((n', y) :: xs) = 
+            applyMap ((n', y) :: xs) =
               if (n' == n1) then applyMap xs
               else  ( n'
-                    , MkNextStates  y.condition 
+                    , MkNextStates  y.condition
                                     (applyFilter (n, n1) y.isSat)) :: applyMap xs
 
 public export
