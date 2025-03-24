@@ -148,15 +148,15 @@ compile (Rep {a} re) =
 compile {a = String} (Group r) = asSM (groupSM r) where
   asSM : GroupSM -> SM String
   asSM (MkGroupSM initStates statesWithNext max) =
-    let lookup : Nat -> SnocList Type
+    let lookup : GroupThompson.State -> SnocList Type
         lookup _ = [<]
-        init : InitStatesType String Nat lookup
+        init : InitStatesType String GroupThompson.State lookup
         init = map (\case
                       Just s => (Just s ** [< Record] `Element` [< InitRecord])
                       Nothing => (Nothing ** [< EmitString] `Element`
                                              [< InitEmitString]))
                    initStates
-        next : TransitionRelation String Nat lookup
+        next : TransitionRelation String GroupThompson.State lookup
         next s c with (find (\case (n, ns) => n == s) statesWithNext)
           next s c | Nothing = []
           next s c | (Just (_, (MkNextStates condition isSat))) =
@@ -165,7 +165,7 @@ compile {a = String} (Group r) = asSM (groupSM r) where
                         Nothing => (Nothing ** [< EmitString])
                         Just s => (Just s ** [<])) isSat
             else []
-    in MkSM Nat lookup init next
+    in MkSM GroupThompson.State lookup init next
 compile (Conv {a,b} re f) =
   let MkSM t lookup initPrev nextPrev := compile re
       init : InitStatesType b t lookup

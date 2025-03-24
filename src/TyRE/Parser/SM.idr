@@ -234,6 +234,7 @@ execOnThread sm c (MkThread (Just st) info) =
   in map (\case (ns ** rt) => MkThread ns (execRoutine (reverse rt) (Left c) infoWithChar))
          (sm.next st c)
 
+export
 getFromStack : Stack [< t] -> t
 getFromStack ([< r]) = Force r
 
