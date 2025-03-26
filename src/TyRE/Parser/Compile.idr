@@ -432,47 +432,6 @@ doCompile re = do
     -- qre <- quote re
     stage (compile re)
 
-
-%logging "tyre" 100
-
-bah : CompiledSM String
--- bah = %runElab doCompile $ Group $ Rep {a=Either Char Char} (MatchChar (Range ('a', 'z')) <|> MatchChar (Range ('g', 'h')))
-
--- foo : CompiledSM (SnocList (Either () Char))
--- foo = %runElab doCompile $ Rep {a = Either () Char} $ Conv (MatchChar (Range ('a', 'r'))) (\x : Char => ()) <|> MatchChar (Range ('r', 'q'))
-foo : CompiledSM String
--- foo = %runElab doCompile $ r "`([01][0-9])`"
--- foo = %runElab doCompile $ Group $ Rep {a = Either () Char} $ Conv (MatchChar (Range ('a', 'r'))) (\x : Char => ()) <|> MatchChar (Range ('r', 'q'))
--- foo = %runElab doCompile (Group (Rep $ MatchChar (Range ('a', 'z'))))
--- foo = %runElab doCompile (Group (MatchChar (Range ('a', 'z'))) `Conv` id)
--- foo = %runElab doCompile (Group (MatchChar (Range ('a', 'z')) <*> MatchChar (Range ('a', 'z'))))
-
-timeRE : TyRE (SnocList (Nat, Nat))
-timeRE = Rep $
-    Conv
-        ( (MatchChar (Range ('0', '1')) <*> MatchChar (Range ('0', '9')))
-        `or` (MatchChar (Range ('2', '2')) <*> MatchChar (Range ('0', '3')))
-        ) f
-    -- <* MatchChar (Range (':', ':'))
-    <*> Conv
-        (MatchChar (Range ('0', '5')) <*> MatchChar (Range ('0', '9')))
-        f
--- timeRE = Rep $
---     map f (r "([01][0-9])!" `or` r "([2][0-3])!")
---     <*> map f (r ":([0-5][0-9])!")
-  where
-    digit : Char -> Nat
-    digit c = cast c `minus` cast '0'
-
-    f : (Char, Char) -> Nat
-    f (c1, c2) = 10 * digit c1 + digit c2
-
-export
-timeCompiled : CompiledSM (SnocList (Nat, Nat))
--- timeCompiled = %runElab doCompile timeRE
-
 -- Compiles here
 simple : CompiledSM Unit
 simple = %runElab doCompile Empty
-
-
