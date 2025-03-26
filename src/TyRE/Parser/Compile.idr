@@ -354,14 +354,17 @@ showInstr MkRight = pure "MkRight"
 showInstr MkSnoc = pure "MkSnoc"
 showInstr (MapTop f) = pure "MapTop"
 
-parameters {0 t : Type} (fc : FC) (sm : ReflectedSM t)
+parameters {0 t : Type} (sm : ReflectedSM t)
+    public export
     mkInit : List (Thread t sm.lookup)
     mkInit = map (\(st ** stk) => MkThread st stk) sm.init
 
+    public export
     list : List TTImp -> TTImp
     list [] = `([])
     list (x :: xs) = `(~x :: ~(list xs))
 
+    public export
     genArm : TTImp -> sm.state -> Elab Clause
     genArm c s = do
         logMsg "tyre" 10 "About to generate arm"
@@ -391,25 +394,29 @@ parameters {0 t : Type} (fc : FC) (sm : ReflectedSM t)
         let threads = list threads
         logMsg "tyre" 20 "compiled threads"
         let rhs = `(if ~sat ~c then ~threads else [])
-        pure $ PatClause fc lhs rhs
+        pure $ PatClause EmptyFC lhs rhs
 
+    public export
     defaultArm : Clause
-    defaultArm = PatClause fc `(MkThread _ _) `([])
+    defaultArm = PatClause EmptyFC `(_) `([])
 
+    public export
     genCase : TTImp -> TTImp -> Elab (List (Thread t sm.lookup))
     genCase td c = do
         cls <- traverse (genArm c) sm.enumerate
         logMsg "tyre" 30 "About to quote case type"
         caseTy <- quote (Thread t sm.lookup)
         logMsg "tyre" 10 "Compiled all arms, about to check case"
-        check $ ICase fc [] td caseTy (cls ++ [defaultArm])
+        check $ ICase EmptyFC [] td caseTy (cls ++ [defaultArm])
 
+    public export
     mkNext : Elab (Thread t sm.lookup -> Char -> List (Thread t sm.lookup))
     mkNext = lambda (Thread t sm.lookup) $ \td => lambda Char $ \c => do
         td <- quote td
         c <- quote c
         genCase td c
 
+    public export
     stage : Elab (CompiledSM t)
     stage = do
         -- logSugaredTerm "tyre" 20 "About to compile TyRE with next" !(quote sm.next)
@@ -422,8 +429,8 @@ parameters {0 t : Type} (fc : FC) (sm : ReflectedSM t)
 export
 doCompile : {0 t : Type} -> TyRE t -> Elab (CompiledSM t)
 doCompile re = do
-    qre <- quote re
-    stage (getFC qre) (compile re)
+    -- qre <- quote re
+    stage (compile re)
 
 
 %logging "tyre" 100
@@ -460,6 +467,12 @@ timeRE = Rep $
     f : (Char, Char) -> Nat
     f (c1, c2) = 10 * digit c1 + digit c2
 
+export
 timeCompiled : CompiledSM (SnocList (Nat, Nat))
 -- timeCompiled = %runElab doCompile timeRE
+
+-- Compiles here
+simple : CompiledSM Unit
+simple = %runElab doCompile Empty
+
 
