@@ -336,6 +336,10 @@ asState i = IPrimVal EmptyFC $ B32 $ cast i
 asChar : Char -> TTImp
 asChar c = IPrimVal EmptyFC $ Ch c
 
+quoteStack : Stack as -> Elab TTImp
+quoteStack [<] = pure `([<])
+quoteStack (stk :< x) = (\stk, x => `(~stk :< ~x)) <$> quoteStack stk <*> quote x
+
 parameters {0 t : Type} (sm : ReflectedSM t)
     mkLookup : Elab TTImp
     mkLookup = do
@@ -352,31 +356,33 @@ parameters {0 t : Type} (sm : ReflectedSM t)
     mkInit = ttimpList <$> traverse
         (\(st ** stk) => do
             let st = ttimpMaybe $ (asState . sm.toInt) <$> st
-            stk <- quote stk
+            logMsg "tyre" 20 "      quote stk"
+            stk <- quoteStack stk
             pure `(MkThread ~st ~stk))
         sm.init
 
     public export
     genArm : TTImp -> sm.state -> Elab Clause
     genArm c s = do
-        let sn = sm.next s
+        logMsg "tyre" 20 "      sm.next s"
         let (cond, xs) = sm.next s
         let sq = asState $ sm.toInt s
+        logMsg "tyre" 20 "      generate sat"
         sat <- case cond of
             OneOf x => ?todo
             Range (lo, hi) => pure `(~(asChar lo) <= ~c && ~c <= ~(asChar hi))
             Pred f => quote f <&> \f => `(~f ~c)
         let lhs = `(MkThread (Just ~sq) stk)
-        -- logMsg "tyre" 20 "Compiling threads"
+        logMsg "tyre" 20 "Compiling threads"
         threads <- traverse
             (\(st2 ** upd) => do
-                -- logMsg "tyre" 30 "\tAbout to quote next state"
+                logMsg "tyre" 30 "\tAbout to quote next state"
                 let st2 = ttimpMaybe $ (asState . sm.toInt) <$> st2
-                -- logSugaredTerm "tyre" 25 "\tCompiling transition to" st2
+                logSugaredTerm "tyre" 25 "\tCompiling transition to" st2
                 is <- showInstr upd
-                -- logMsg "tyre" 35 "\tCompiling \{is}"
+                logMsg "tyre" 35 "\tCompiling \{is}"
                 stk' <- interpQ upd `(Force stk) c
-                -- logMsg "tyre" 25 "\tCompiled instructions"
+                logMsg "tyre" 25 "\tCompiled instructions"
                 pure `(MkThread ~st2 (Delay ~stk')))
             xs
         let threads = ttimpList threads
@@ -397,8 +403,11 @@ parameters {0 t : Type} (sm : ReflectedSM t)
     public export
     stage : Elab TTImp
     stage = do
+        logMsg "tyre" 5 "    mkLookup"
         lookup <- mkLookup
+        logMsg "tyre" 5 "    mkInit"
         init <- mkInit
+        logMsg "tyre" 5 "    mkNext"
         next <- mkNext
         pure $ `(MkCompiledSM ~state ~lookup ~init ~next)
 
@@ -460,7 +469,11 @@ rewriteDecl tmpNS genNS resTys d@(IDef fc n _) = case lookup n resTys of
         logMsg "tyre" 5 "Compiling TyRE: \{show n}"
         res <- check {expected = Type} resTy
         val <- check {expected = TyRE res} $ IVar EmptyFC $ NS tmpNS n
-        staged <- stage (compile val)
+        logMsg "tyre" 5 "  About to compile"
+        let re = compile val
+        logMsg "tyre" 5 "  About to stage"
+        staged <- stage re
+        logMsg "tyre" 5 "  Replacing tmp namespace"
         let staged = replaceNs tmpNS genNS staged
         pure $ IDef fc n [PatClause fc (IVar EmptyFC n) staged]
     Nothing => pure d
@@ -503,8 +516,8 @@ createTyREMod n ds = do
 
     logMsg "tyre" 5 "Done"
 
--- doCompile : TyRE t -> Elab (CompiledSM t)
--- doCompile re = stage (compile re)
+doCompile : TyRE t -> Elab (CompiledSM t)
+doCompile re = stage (compile re) >>= check
 
 %logging "tyre" 100
 
@@ -532,7 +545,7 @@ createTyREMod n ds = do
             ( (MatchChar (Range ('0', '1')) <*> MatchChar (Range ('0', '9')))
             `or` (MatchChar (Range ('2', '2')) <*> MatchChar (Range ('0', '3')))
             ) f
-        -- <* MatchChar (Range (':', ':'))
+        <* MatchChar (Range (':', ':'))
         <*> Conv
             (MatchChar (Range ('0', '5')) <*> MatchChar (Range ('0', '9')))
             f
