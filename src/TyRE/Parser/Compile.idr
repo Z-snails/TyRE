@@ -41,10 +41,6 @@ data Instruction : SnocList Type -> SnocList Type -> Type where
     -- Lift a function to operate on the stack
     MapTop : (a -> b) -> Instruction (pre :< a) (pre :< b)
 
--- data Routine : SnocList Type -> SnocList Type -> Type where
---     Nop : Routine as as
---     Then : Routine as bs -> Instruction bs cs -> Routine as cs
-
 private infixl 7 `Then`
 
 -- namespace Instruction
@@ -60,21 +56,6 @@ lift MkLeft = MkLeft
 lift MkRight = MkRight
 lift MkSnoc = MkSnoc
 lift (MapTop f) = MapTop f
-
--- namespace Routine
---     export
---     lift : Routine as bs -> Routine (pre ++ as) (pre ++ bs)
---     lift Nop = Nop
---     lift (is `Then` i) = lift is `Then` lift i
-
---     export
---     (++) : Routine as bs -> Routine bs cs -> Routine as cs
---     is ++ Nop = is
---     is ++ (js `Then` j) = (is ++ js) `Then` j
-
--- thenPushAll : Routine as bs -> Stack cs -> Routine as (bs ++ cs)
--- thenPushAll r [<] = r
--- thenPushAll r (xs :< x) = (r `thenPushAll` xs) `Then` Push x
 
 thenPushAll : Instruction as bs -> Stack cs -> Instruction as (bs ++ cs)
 thenPushAll r [<] = r
@@ -304,27 +285,6 @@ compile {a = b} (Conv x f) =
                 xs)
     in MkReflectedSM xm.state xm.lookup xm.enumerate init next
 
--- optInstr : {0 as, bs : SnocList Type} -> Routine as bs -> Routine as bs
--- optInstr
--- optInstr (Compose x y) = case (optInstr x, optInstr y) of
---     (Nop, y') => y'
---     (x', Nop) => x'
---     (x', y') => Compose x' y'
--- optInstr x = x
-
--- %inline
-interp : (i : Instruction as bs) -> Interp as bs
-interp GetChar = getChar
-interp PushChar = pushChar
-interp Pack = pack
-interp (Push x) = push x
-interp (i `Then` j) = compose (interp i) (interp j)
-interp MkPair = mkPair
-interp MkLeft = mkLeft
-interp MkRight = mkRight
-interp MkSnoc = mkSnoc
-interp (MapTop f) = mapTop f
-
 interpQ : Instruction as bs -> (stk : TTImp) -> (c : TTImp) -> Elab TTImp
 interpQ GetChar stk c = pure `(~stk :< ~c)
 interpQ PushChar stk c = pure `(pushChar ~stk ~c)
@@ -381,14 +341,9 @@ parameters {0 t : Type} (sm : ReflectedSM t)
                 st2 <- quote st2
                 logSugaredTerm "tyre" 25 "\tCompiling transition to" st2
                 is <- showInstr upd
-                -- logSugaredTerm "tyre" 35 "\tInstructions" upd
                 logMsg "tyre" 35 "\tCompiling \{is}"
-                -- upd <- quote (interp upd)
                 stk' <- interpQ upd `(Force stk) c
-                -- upd <- quote upd
-                -- upd <- quote (interpR upd)
                 logMsg "tyre" 25 "\tCompiled instructions"
-                -- pure `(MkThread ~st2 (Delay (interp ~upd (Force stk) ~c))))
                 pure `(MkThread ~st2 (Delay ~stk')))
             xs
         let threads = list threads
@@ -427,17 +382,14 @@ parameters {0 t : Type} (sm : ReflectedSM t)
         pure $ MkCompiledSM sm.state sm.lookup mkInit next
 
 export
-doCompile : {0 t : Type} -> TyRE t -> Elab (CompiledSM t)
-doCompile re = do
-    -- qre <- quote re
-    stage (compile re)
-
+doCompile : TyRE t -> Elab (CompiledSM t)
+doCompile re = stage (compile re)
 
 %logging "tyre" 100
 
 bah : CompiledSM String
--- bah = %runElab doCompile $ Group $ Rep {a=Either Char Char} (MatchChar (Range ('a', 'z')) <|> MatchChar (Range ('g', 'h')))
-
+bah = %runElab doCompile $ Group $ Rep {a = Either Char (Char, Char)} (MatchChar (Range ('a', 'z')) <|> (MatchChar (Range ('g', 'h')) <*> MatchChar (Range ('i', 'j'))))
+{-
 -- foo : CompiledSM (SnocList (Either () Char))
 -- foo = %runElab doCompile $ Rep {a = Either () Char} $ Conv (MatchChar (Range ('a', 'r'))) (\x : Char => ()) <|> MatchChar (Range ('r', 'q'))
 foo : CompiledSM String
@@ -474,5 +426,3 @@ timeCompiled : CompiledSM (SnocList (Nat, Nat))
 -- Compiles here
 simple : CompiledSM Unit
 simple = %runElab doCompile Empty
-
-
