@@ -1,4 +1,4 @@
-module TyRE.Parser.Compile
+module TyRE.Parser.CompileV2
 
 import Language.Reflection
 import Data.Fin
@@ -10,6 +10,7 @@ import Syntax.PreorderReasoning
 import TyRE.Core
 import TyRE.Parser.GroupThompson
 import public TyRE.Parser.Compile.Runtime
+import TyRE.Extra.Idris
 import TyRE.Extra.Elab
 
 import Data.Regex
@@ -83,6 +84,10 @@ record ReflectedSM (t : Type) where
     {auto isOrd : Ord state}
     -- The list of all states
     enumerate : List state
+    -- The number of states (ie length enumerate)
+    size : Integer
+    -- Conversion from state to Nat
+    toInt : state -> Integer
     -- The set of initial states
     init : InitStatesType t state lookup
     -- The transition function
@@ -102,7 +107,7 @@ splitAccept ((Just st ** stk) :: xs) = case splitAccept {f} xs of
 
 public export
 compile : {0 a : Type} -> TyRE a -> ReflectedSM a
-compile Empty = MkReflectedSM Void absurd [] [(Nothing ** [< ()])] (\st1 => absurd st1)
+compile Empty = MkReflectedSM Void absurd [] 0 absurd [(Nothing ** [< ()])] (\st1 => absurd st1)
 compile (MatchChar f) =
     let 0 lookup : () -> SnocList Type
         lookup () = [<]
@@ -110,7 +115,7 @@ compile (MatchChar f) =
         init = [(Just () ** [<])]
         next : TransitionRelation a () lookup
         next () = (f, [(Nothing ** GetChar)])
-    in MkReflectedSM () lookup [()] init next
+    in MkReflectedSM () lookup [()] 1 (const 0) init next
 compile ((<*>) {a, b} x y) =
     let
         xm = compile x
@@ -126,7 +131,11 @@ compile ((<*>) {a, b} x y) =
         lookup (Left x) = xm.lookup x
         lookup (Right y) = [< a] ++ ym.lookup y
 
-        enumerate = map Left xm.enumerate ++ map Right ym.enumerate
+        enumerate := map Left xm.enumerate ++ map Right ym.enumerate
+
+        toInt : T -> Integer
+        toInt (Left x) = xm.toInt x
+        toInt (Right y) = xm.size + ym.toInt y
 
         init : InitStatesType (a, b) T lookup
         init = case splitAccept {f = Stack} xm.init of
@@ -160,7 +169,7 @@ compile ((<*>) {a, b} x y) =
                         (Nothing ** lift upd `Then` MkPair))
                 ys)
 
-    in MkReflectedSM T lookup enumerate init next
+    in MkReflectedSM T lookup enumerate (xm.size + ym.size) toInt init next
 compile ((<|>) {a, b} x y) =
     let xm = compile x
         ym = compile y
@@ -175,7 +184,11 @@ compile ((<|>) {a, b} x y) =
         lookup (Left x) = xm.lookup x
         lookup (Right y) = ym.lookup y
 
-        enumerate = map Left xm.enumerate ++ map Right ym.enumerate
+        enumerate := map Left xm.enumerate ++ map Right ym.enumerate
+
+        toInt : T -> Integer
+        toInt (Left x) = xm.toInt x
+        toInt (Right y) = xm.size + ym.toInt y
 
         init : InitStatesType (Either a b) T lookup
         init =
@@ -207,7 +220,7 @@ compile ((<|>) {a, b} x y) =
                     (Nothing ** upd) => (Nothing ** upd `Then` MkRight))
                 ys)
 
-    in MkReflectedSM T lookup enumerate init next
+    in MkReflectedSM T lookup enumerate (xm.size + ym.size) toInt init next
 compile (Rep {a} x) =
     let xm = compile x
         0 T : Type
@@ -234,7 +247,7 @@ compile (Rep {a} x) =
                 (Just st2 ** upd) =>
                     [(Just st2 ** lift upd)])
 
-    in MkReflectedSM T lookup xm.enumerate init next
+    in MkReflectedSM T lookup xm.enumerate xm.size xm.toInt init next
 compile (Group r) =
     let MkGroupSM initStates statesWithNext max = groupSM r
 
@@ -265,7 +278,7 @@ compile (Group r) =
                 )
             Nothing => (Range ('1', '0'), [])
 
-    in MkReflectedSM T lookup enumerate init next
+    in MkReflectedSM T lookup enumerate max id init next
 compile {a = b} (Conv x f) =
     let xm = compile x
         _ = xm.isOrd
@@ -283,7 +296,7 @@ compile {a = b} (Conv x f) =
                     (Nothing ** upd) => (Nothing ** upd `Then` MapTop f)
                     (Just st ** upd) => (Just st ** upd))
                 xs)
-    in MkReflectedSM xm.state xm.lookup xm.enumerate init next
+    in MkReflectedSM xm.state xm.lookup xm.enumerate xm.size xm.toInt init next
 
 interpQ : Instruction as bs -> (stk : TTImp) -> (c : TTImp) -> Elab TTImp
 interpQ GetChar stk c = pure `(~stk :< ~c)
@@ -314,31 +327,57 @@ showInstr MkRight = pure "MkRight"
 showInstr MkSnoc = pure "MkSnoc"
 showInstr (MapTop f) = pure "MapTop"
 
+state : TTImp
+state = `(Bits32)
+
+asState : Integer -> TTImp
+asState i = IPrimVal EmptyFC $ B32 $ cast i
+
+asChar : Char -> TTImp
+asChar c = IPrimVal EmptyFC $ Ch c
+
+quoteStack : Stack as -> Elab TTImp
+quoteStack [<] = pure `([<])
+quoteStack (stk :< x) = (\stk, x => `(~stk :< ~x)) <$> quoteStack stk <*> quote x
+
 parameters {0 t : Type} (sm : ReflectedSM t)
-    public export
-    mkInit : List (Thread t sm.lookup)
-    mkInit = map (\(st ** stk) => MkThread st stk) sm.init
+    mkLookup : Elab TTImp
+    mkLookup = do
+        cs <- for sm.enumerate $ \st =>
+            let 0 stk = sm.lookup st
+                i = asState $ sm.toInt st
+            in quote stk <&> \stk => PatClause EmptyFC i stk
+        let cs = cs ++ [PatClause EmptyFC `(_) `([<])]
+        let cas = ICase EmptyFC [] `(st) state cs
+        pure `(\st => ~cas)
 
     public export
-    list : List TTImp -> TTImp
-    list [] = `([])
-    list (x :: xs) = `(~x :: ~(list xs))
+    mkInit : Elab TTImp
+    mkInit = ttimpList <$> traverse
+        (\(st ** stk) => do
+            let st = ttimpMaybe $ (asState . sm.toInt) <$> st
+            logMsg "tyre" 20 "      quote stk"
+            stk <- quoteStack stk
+            pure `(MkThread ~st ~stk))
+        sm.init
 
     public export
     genArm : TTImp -> sm.state -> Elab Clause
     genArm c s = do
-        logMsg "tyre" 10 "About to generate arm"
-        let sn = sm.next s
+        logMsg "tyre" 20 "      sm.next s"
         let (cond, xs) = sm.next s
-        sq <- quote s
-        logSugaredTerm "tyre" 15 "State" sq
-        sat <- quote (satisfies cond)
+        let sq = asState $ sm.toInt s
+        logMsg "tyre" 20 "      generate sat"
+        sat <- case cond of
+            OneOf x => ?todo
+            Range (lo, hi) => pure `(~(asChar lo) <= ~c && ~c <= ~(asChar hi))
+            Pred f => quote f <&> \f => `(~f ~c)
         let lhs = `(MkThread (Just ~sq) stk)
         logMsg "tyre" 20 "Compiling threads"
         threads <- traverse
             (\(st2 ** upd) => do
                 logMsg "tyre" 30 "\tAbout to quote next state"
-                st2 <- quote st2
+                let st2 = ttimpMaybe $ (asState . sm.toInt) <$> st2
                 logSugaredTerm "tyre" 25 "\tCompiling transition to" st2
                 is <- showInstr upd
                 logMsg "tyre" 35 "\tCompiling \{is}"
@@ -346,9 +385,8 @@ parameters {0 t : Type} (sm : ReflectedSM t)
                 logMsg "tyre" 25 "\tCompiled instructions"
                 pure `(MkThread ~st2 (Delay ~stk')))
             xs
-        let threads = list threads
-        logMsg "tyre" 20 "compiled threads"
-        let rhs = `(if ~sat ~c then ~threads else [])
+        let threads = ttimpList threads
+        let rhs = `(if ~sat then ~threads else [])
         pure $ PatClause EmptyFC lhs rhs
 
     public export
@@ -356,73 +394,159 @@ parameters {0 t : Type} (sm : ReflectedSM t)
     defaultArm = PatClause EmptyFC `(_) `([])
 
     public export
-    genCase : TTImp -> TTImp -> Elab (List (Thread t sm.lookup))
-    genCase td c = do
-        cls <- traverse (genArm c) sm.enumerate
-        logMsg "tyre" 30 "About to quote case type"
-        caseTy <- quote (Thread t sm.lookup)
-        logMsg "tyre" 10 "Compiled all arms, about to check case"
-        check $ ICase EmptyFC [] td caseTy (cls ++ [defaultArm])
+    mkNext : Elab TTImp
+    mkNext = do
+        cls <- traverse (genArm `(c)) sm.enumerate
+        let cas = ICase EmptyFC [] `(td) `(_) (cls ++ [defaultArm])
+        pure `(\td => \c => ~cas)
 
     public export
-    mkNext : Elab (Thread t sm.lookup -> Char -> List (Thread t sm.lookup))
-    mkNext = lambda (Thread t sm.lookup) $ \td => lambda Char $ \c => do
-        td <- quote td
-        c <- quote c
-        genCase td c
-
-    public export
-    stage : Elab (CompiledSM t)
+    stage : Elab TTImp
     stage = do
-        -- logSugaredTerm "tyre" 20 "About to compile TyRE with next" !(quote sm.next)
-        let _ = sm.isOrd
-        logMsg "tyre" 5 "About to compile next function"
+        logMsg "tyre" 5 "    mkLookup"
+        lookup <- mkLookup
+        logMsg "tyre" 5 "    mkInit"
+        init <- mkInit
+        logMsg "tyre" 5 "    mkNext"
         next <- mkNext
-        logMsg "tyre" 5 "Generated next function"
-        pure $ MkCompiledSM sm.state sm.lookup mkInit next
+        pure $ `(MkCompiledSM ~state ~lookup ~init ~next)
 
-export
+asTyRE : TTImp -> Maybe TTImp
+asTyRE ty@(IApp _ (IVar _ n) res) = if n == `{TyRE} then Just res else Nothing
+asTyRE _ = Nothing
+
+getTyREs : List Decl -> List (Name, TTImp)
+getTyREs ds = ds >>= \case
+    IClaim claim => case claim.value of
+        MkIClaimData _ _ _ (MkTy _ n ty) => case asTyRE ty of
+            Just resTy => [(n.value, resTy)]
+            Nothing => []
+    _ => []
+
+checkTerm : TTImp -> Elab ()
+checkTerm t = case doCheck t of
+    Left (fc, msg) => failAt fc msg
+    Right _ => pure ()
+  where
+    doCheck : TTImp -> Either (FC, String) ()
+    doCheck = ignore . mapMTTImp (\case
+        ILocal fc _ _ => Left (fc, "Unable to compile terms with local functions. Make these into top level functions")
+        t@(IAlternative _ _ [_]) => Right t
+        t@(IAlternative fc _ _) => Left (fc, "Unable to compile terms using some forms of overloading, including (,) syntax for Pair and MkPair")
+        t => Right t)
+
+checkClause : Clause -> Elab ()
+checkClause (PatClause fc lhs rhs) = checkTerm lhs *> checkTerm rhs
+checkClause (WithClause fc lhs rig wval prf flags cls) = ?dfghk
+checkClause (ImpossibleClause fc lhs) = checkTerm lhs
+
+checkDecl : Decl -> Elab Decl
+checkDecl d@(IClaim x) = do
+    let MkIClaimData _ _ _ (MkTy _ _ ty) = x.value
+    checkTerm ty
+    pure d
+checkDecl d@(IData fc x mtreq dt) = ?dfhk_1
+checkDecl d@(IDef fc nm cls) = d <$ traverse checkClause cls
+checkDecl d@(IParameters fc params decls) = d <$ assert_total (traverse checkDecl decls)
+checkDecl d@(IRecord fc mstr x mtreq rec) = ?dfhk_4
+checkDecl d@(INamespace fc ns decls) = d <$ assert_total (traverse checkDecl decls)
+checkDecl d@(ITransform fc nm s t) = ?dfhk_6
+checkDecl d@(IRunElabDecl fc s) = ?dfhk_7
+checkDecl d@(ILog x) = ?dfhk_8
+checkDecl d@(IBuiltin fc bty nm) = ?dfhk_9
+
+rewriteDecl : (tmpNS, genNS : Namespace) -> List (Name, TTImp) -> Decl -> Elab Decl
+rewriteDecl tmpNS genNS resTys d@(IClaim x) = do
+    let MkIClaimData count vis opts (MkTy fc n ty) = x.value
+    case asTyRE ty of
+        Just resTy =>
+            let ty = `(CompiledSM ~resTy)
+            in pure $ IClaim $
+                MkFCVal x.fc (MkIClaimData count vis opts (MkTy fc n ty))
+        Nothing => pure d
+rewriteDecl tmpNS genNS resTys d@(IDef fc n _) = case lookup n resTys of
+    Just resTy => do
+        logMsg "tyre" 5 "Compiling TyRE: \{show n}"
+        res <- check {expected = Type} resTy
+        val <- check {expected = TyRE res} $ IVar EmptyFC $ NS tmpNS n
+        logMsg "tyre" 5 "  About to compile"
+        let re = compile val
+        logMsg "tyre" 5 "  About to stage"
+        staged <- stage re
+        logMsg "tyre" 5 "  Replacing tmp namespace"
+        let staged = replaceNs tmpNS genNS staged
+        pure $ IDef fc n [PatClause fc (IVar EmptyFC n) staged]
+    Nothing => pure d
+rewriteDecl tmpNS genNS resTys d = pure d
+
+defaultImports : List ModuleIdent
+defaultImports = [`{TyRE.Parser.Compile.Runtime}]
+
+export covering
+createTyREMod : Name -> List Decl -> Elab ()
+createTyREMod n ds = do
+    logMsg "tyre" 5 "Starting"
+
+    let Just mi = nameAsMod n
+        | Nothing => fail "Invalid module ident: \{show n}"
+    let relTmpNS = case mi of
+            MkMI parts => MkNS ("_hidden" :: parts)
+    let genNS = modAsNamespace mi
+    thisNS <- currentNS
+    let absTmpNS = thisNS ++ relTmpNS
+
+    -- Declare all functions in a hidden namespace
+    -- to ensure they typecheck and also so we can
+    -- reference the TyREs. We only need to export TyREs
+    declare
+        [ INamespace EmptyFC relTmpNS
+            (map (changeVis $ \case
+                Just ty => case asTyRE ty of { Just _ => Export; Nothing => Private }
+                Nothing => Private)
+                ds)
+        ]
+
+    let resTys = getTyREs ds
+
+    ds' <- traverse (rewriteDecl absTmpNS genNS resTys >=> checkDecl) ds
+
+    let imports = map (\n => MkImport False n Nothing) defaultImports
+
+    writeIfChanged "TyRE" SourceDir (modIdentAsPath mi) (prettyModule mi imports ds')
+
+    logMsg "tyre" 5 "Done"
+
 doCompile : TyRE t -> Elab (CompiledSM t)
-doCompile re = stage (compile re)
+doCompile re = stage (compile re) >>= check
 
 %logging "tyre" 100
 
-bah : CompiledSM String
-bah = %runElab doCompile $ Group $ Rep {a = Either Char (Char, Char)} (MatchChar (Range ('a', 'z')) <|> (MatchChar (Range ('g', 'h')) <*> MatchChar (Range ('i', 'j'))))
-{-
--- foo : CompiledSM (SnocList (Either () Char))
--- foo = %runElab doCompile $ Rep {a = Either () Char} $ Conv (MatchChar (Range ('a', 'r'))) (\x : Char => ()) <|> MatchChar (Range ('r', 'q'))
-foo : CompiledSM String
--- foo = %runElab doCompile $ r "`([01][0-9])`"
--- foo = %runElab doCompile $ Group $ Rep {a = Either () Char} $ Conv (MatchChar (Range ('a', 'r'))) (\x : Char => ()) <|> MatchChar (Range ('r', 'q'))
--- foo = %runElab doCompile (Group (Rep $ MatchChar (Range ('a', 'z'))))
--- foo = %runElab doCompile (Group (MatchChar (Range ('a', 'z'))) `Conv` id)
--- foo = %runElab doCompile (Group (MatchChar (Range ('a', 'z')) <*> MatchChar (Range ('a', 'z'))))
+%runElab createTyREMod `{Generated} `[
+    foo : Char -> Int
+    foo c = ord c - 10
 
-timeRE : TyRE (SnocList (Nat, Nat))
-timeRE = Rep $
-    Conv
-        ( (MatchChar (Range ('0', '1')) <*> MatchChar (Range ('0', '9')))
-        `or` (MatchChar (Range ('2', '2')) <*> MatchChar (Range ('0', '3')))
-        ) f
-    -- <* MatchChar (Range (':', ':'))
-    <*> Conv
-        (MatchChar (Range ('0', '5')) <*> MatchChar (Range ('0', '9')))
-        f
--- timeRE = Rep $
---     map f (r "([01][0-9])!" `or` r "([2][0-3])!")
---     <*> map f (r ":([0-5][0-9])!")
-  where
+    export
+    bah : TyRE Int
+    bah = Conv (MatchChar (Range ('a', 'z'))) foo
+
+    bah2 : TyRE String
+    bah2 = Group $ Rep {a = Either Char (Char, Char)} (MatchChar (Range ('a', 'z')) <|> (MatchChar (Range ('g', 'h')) <*> MatchChar (Range ('i', 'j'))))
+
     digit : Char -> Nat
     digit c = cast c `minus` cast '0'
 
-    f : (Char, Char) -> Nat
-    f (c1, c2) = 10 * digit c1 + digit c2
+    f : Pair Char Char -> Nat
+    f (MkPair c1 c2) = 10 * digit c1 + digit c2
 
-export
-timeCompiled : CompiledSM (SnocList (Nat, Nat))
--- timeCompiled = %runElab doCompile timeRE
-
--- Compiles here
-simple : CompiledSM Unit
-simple = %runElab doCompile Empty
+    export
+    timeRE : TyRE (SnocList (Pair Nat Nat))
+    timeRE = Rep $
+        Conv
+            ( (MatchChar (Range ('0', '1')) <*> MatchChar (Range ('0', '9')))
+            `or` (MatchChar (Range ('2', '2')) <*> MatchChar (Range ('0', '3')))
+            ) f
+        <* MatchChar (Range (':', ':'))
+        <*> Conv
+            (MatchChar (Range ('0', '5')) <*> MatchChar (Range ('0', '9')))
+            f
+]
