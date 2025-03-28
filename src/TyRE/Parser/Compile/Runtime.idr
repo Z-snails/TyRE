@@ -2,6 +2,7 @@ module TyRE.Parser.Compile.Runtime
 
 import Data.SortedSet
 import Data.SnocList
+import public Data.Either
 
 %default total
 
