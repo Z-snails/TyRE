@@ -1,3 +1,5 @@
+module StarComb2
+
 import Text.Lexer
 import Text.Parser.Core
 import Text.Parser
@@ -23,21 +25,7 @@ c = terminal "c" (\tok => case tok of {CChar => Just (); _ => Nothing})
 grammar : Rule Nat
 grammar = map sum ((many (map length (many a <* c) <|> map (\_ => (the Nat) 1) a)) <* b)
 
-createString : Nat -> String
-createString 0 = "b"
-createString (S k) = "a" ++ (createString k)
-
-run : (n : Nat) -> Either (List1 (ParsingError PToken))
-                      (Nat, List (WithBounds PToken))
-run n = parse grammar (fst (lex tokenMap (createString n)))
-
-main : IO ()
-main =  do  str <- getLine
-            if all isDigit (unpack str)
-              then
-                let n : Nat
-                    n = (cast str)
-                in case run n of
-                    Right (res, _) => putStrLn (show res)
-                    Left _ => putStrLn "Error"
-              else putStrLn "Input is not a number"
+export
+run : String -> Either () ()
+run inp = bimap (const ()) (const ()) $
+    parse grammar (fst (lex tokenMap inp))

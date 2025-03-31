@@ -1,3 +1,5 @@
+module StarComb
+
 import Text.Lexer
 import public Text.Parser.Core
 import public Text.Parser
@@ -17,24 +19,13 @@ a = terminal "a" (\tok => case tok of {AChar => Just 'a'; EndTok => Nothing})
 eoi : Rule ()
 eoi = terminal "end" (\tok => case tok of {AChar => Nothing; EndTok => Just ()})
 
+export
 grammar : Rule (List Char)
 grammar = manyTill eoi a
 
-createString : Nat -> String
-createString 0 = "a"
-createString (S k) = "a" ++ (createString k)
-
-run : (n : Nat) -> Either (List1 (ParsingError AToken))
-                      (List Char, List (WithBounds AToken))
-run n = parse grammar (fst (lex tokenMap ((createString n) ++ "$")))
-
-main : IO ()
-main =  do  str <- getLine
-            if all isDigit (unpack str)
-              then
-                let n : Nat
-                    n = (cast str)
-                in case run n of
-                    Right (res, _) => putStrLn (show res)
-                    Left _ => putStrLn "Error"
-              else putStrLn "Input is not a number"
+export
+run :
+    String ->
+    Either () ()
+run inp = bimap (const ()) (const ()) $
+    parse grammar (fst (lex tokenMap (inp ++ "$")))

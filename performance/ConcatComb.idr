@@ -1,6 +1,9 @@
+module ConcatComb
+
 import Text.Lexer
 import Text.Parser.Core
 import Text.Parser
+import Data.List
 
 data AToken = AChar
 
@@ -17,13 +20,9 @@ gType (S k) = (Char, gType k)
 justAGrammar : Rule Char
 justAGrammar = terminal "a" (\tok => Just 'a')
 
-getGrammar : (n : Nat) -> (Rule $ gType n)
+getGrammar : (n : Nat) -> Rule (gType n)
 getGrammar 0 = justAGrammar
 getGrammar (S k) = (map MkPair justAGrammar <*> getGrammar k)
-
-createString : Nat -> List Char
-createString 0 = ['a']
-createString (S k) = 'a'::(createString k)
 
 resToStr  : {auto showChar : Show Char }
           -> {auto showEither : ({a,b : Type} -> (Show a, Show b) => Show (a, b))}
@@ -33,18 +32,16 @@ resToStr (S k) =
   let _ := resToStr k
   in showEither
 
-run : (n : Nat) -> Either (List1 (ParsingError AToken))
-                      (gType n, List (WithBounds AToken))
-run n = parse (getGrammar n) (fst (lex aTokenMap (fastPack $ createString n)))
+export
+Input : Type
+Input = (n : Nat ** (Rule (gType n), String))
 
-main : IO ()
-main =  do  str <- getLine
-            if all isDigit (unpack str)
-              then
-                let n : Nat
-                    n = (cast str)
-                    _ := resToStr n
-                in case run n of
-                    Right (res, _) => putStrLn (show res)
-                    Left _ => putStrLn "Error"
-              else putStrLn "Input needs to be a number"
+export
+getInput : Nat -> Maybe Input -> Input
+getInput n (Just (_ ** (_, cs))) = (n ** (getGrammar n, "a" ++ cs))
+getInput n _ = (n ** (getGrammar n, fastPack $ replicate n 'a'))
+
+export
+run : Input -> Either () ()
+run (n ** (rule, inp)) = bimap (const ()) (const ()) $
+    parse rule (fst (lex aTokenMap inp))
