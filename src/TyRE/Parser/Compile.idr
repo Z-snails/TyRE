@@ -1,23 +1,26 @@
-module TyRE.Parser.CompileV2
+module TyRE.Parser.Compile
 
 import Language.Reflection
-import Data.Fin
 import Data.SortedSet
 import Data.DPair
 import Data.SnocList
-import Syntax.PreorderReasoning
 
 import TyRE.Core
-import TyRE.Parser.GroupThompson
+import public TyRE.Parser.GroupThompson
 import public TyRE.Parser.Compile.Runtime
 import TyRE.Extra.Idris
 import TyRE.Extra.Elab
 
 import Data.Regex
+import TyRE.StringRE
 
 %default total
 
 %language ElabReflection
+
+%hide TyRE.Core.infixr.(<*>)
+%hide TyRE.Core.infixr.(<*)
+%hide TyRE.Core.infixr.(*>)
 
 %hide TyRE.DisjointMatches.infix.(::)
 %hide TyRE.DisjointMatches.infix.(:<)
@@ -81,12 +84,11 @@ record ReflectedSM (t : Type) where
     0 state : Type
     -- The number of non-accepting states
     0 lookup : state -> SnocList Type
-    {auto isOrd : Ord state}
     -- The list of all states
     enumerate : List state
     -- The number of states (ie length enumerate)
     size : Integer
-    -- Conversion from state to Nat
+    -- Conversion from state to Integer
     toInt : state -> Integer
     -- The set of initial states
     init : InitStatesType t state lookup
@@ -120,9 +122,6 @@ compile ((<*>) {a, b} x y) =
     let
         xm = compile x
         ym = compile y
-
-        _ = xm.isOrd
-        _ = ym.isOrd
 
         0 T : Type
         T = Either xm.state ym.state
@@ -174,9 +173,6 @@ compile ((<|>) {a, b} x y) =
     let xm = compile x
         ym = compile y
 
-        _ = xm.isOrd
-        _ = ym.isOrd
-
         0 T : Type
         T = Either xm.state ym.state
 
@@ -225,8 +221,6 @@ compile (Rep {a} x) =
     let xm = compile x
         0 T : Type
         T = xm.state
-
-        _ := xm.isOrd
 
         0 lookup : T -> SnocList Type
         lookup s = [< SnocList a] ++ xm.lookup s
@@ -281,7 +275,6 @@ compile (Group r) =
     in MkReflectedSM T lookup enumerate max id init next
 compile {a = b} (Conv x f) =
     let xm = compile x
-        _ = xm.isOrd
         init : InitStatesType b xm.state xm.lookup
         init = map
             (\case
@@ -409,7 +402,7 @@ parameters {0 t : Type} (sm : ReflectedSM t)
         init <- mkInit
         logMsg "tyre" 5 "    mkNext"
         next <- mkNext
-        pure $ `(MkCompiledSM ~state ~lookup ~init ~next)
+        pure $ stripImplicitHoles `(MkCompiledSM ~state ~lookup ~init ~next)
 
 asTyRE : TTImp -> Maybe TTImp
 asTyRE ty@(IApp _ (IVar _ n) res) = if n == `{TyRE} then Just res else Nothing
@@ -432,7 +425,7 @@ checkTerm t = case doCheck t of
     doCheck = ignore . mapMTTImp (\case
         ILocal fc _ _ => Left (fc, "Unable to compile terms with local functions. Make these into top level functions")
         t@(IAlternative _ _ [_]) => Right t
-        t@(IAlternative fc _ _) => Left (fc, "Unable to compile terms using some forms of overloading, including (,) syntax for Pair and MkPair")
+        t@(IAlternative fc _ _) => Left (fc, "Unable to compile terms using some forms of overloading:\n  - (a, b) syntax for Pair and MkPair\n  - () syntax for Unit and MkUnit")
         t => Right t)
 
 checkClause : Clause -> Elab ()
@@ -450,10 +443,7 @@ checkDecl d@(IDef fc nm cls) = d <$ traverse checkClause cls
 checkDecl d@(IParameters fc params decls) = d <$ assert_total (traverse checkDecl decls)
 checkDecl d@(IRecord fc mstr x mtreq rec) = ?dfhk_4
 checkDecl d@(INamespace fc ns decls) = d <$ assert_total (traverse checkDecl decls)
-checkDecl d@(ITransform fc nm s t) = ?dfhk_6
-checkDecl d@(IRunElabDecl fc s) = ?dfhk_7
-checkDecl d@(ILog x) = ?dfhk_8
-checkDecl d@(IBuiltin fc bty nm) = ?dfhk_9
+checkDecl d = pure d
 
 rewriteDecl : (tmpNS, genNS : Namespace) -> List (Name, TTImp) -> Decl -> Elab Decl
 rewriteDecl tmpNS genNS resTys d@(IClaim x) = do
@@ -483,8 +473,8 @@ defaultImports : List ModuleIdent
 defaultImports = [`{TyRE.Parser.Compile.Runtime}]
 
 export covering
-createTyREMod : Name -> List Decl -> Elab ()
-createTyREMod n ds = do
+createTyREMod : Name -> List Name -> List Decl -> Elab ()
+createTyREMod n imports ds = do
     logMsg "tyre" 5 "Starting"
 
     let Just mi = nameAsMod n
@@ -510,18 +500,22 @@ createTyREMod n ds = do
 
     ds' <- traverse (rewriteDecl absTmpNS genNS resTys >=> checkDecl) ds
 
-    let imports = map (\n => MkImport False n Nothing) defaultImports
+    let Just imports = traverse (map (\n => MkImport False n Nothing) . nameAsMod) imports
+        | Nothing => fail "Invalid namespace in import list"
+    let allImports = map (\n => MkImport False n Nothing) defaultImports ++ imports
 
-    writeIfChanged "TyRE" SourceDir (modIdentAsPath mi) (prettyModule mi imports ds')
+    writeIfChanged "TyRE" SourceDir (modIdentAsPath mi) (prettyModule mi allImports ds')
 
     logMsg "tyre" 5 "Done"
 
-doCompile : TyRE t -> Elab (CompiledSM t)
-doCompile re = stage (compile re) >>= check
+export
+compileRE : TyRE t -> Elab (CompiledSM t)
+compileRE re = stage (compile re) >>= check
 
 %logging "tyre" 100
+-- %logging "eval.stuck" 20
 
-%runElab createTyREMod `{Generated} `[
+%runElab createTyREMod `{Generated} [] `[
     foo : Char -> Int
     foo c = ord c - 10
 
@@ -550,3 +544,47 @@ doCompile re = stage (compile re) >>= check
             (MatchChar (Range ('0', '5')) <*> MatchChar (Range ('0', '9')))
             f
 ]
+
+-- %runElab createTyREMod `{UrlRegex} [] `[
+--     covering
+--     alpha : DontCompile $ TyRE Unit
+--     alpha = r "[a-z]|[A-Z]"
+
+--     covering
+--     num : DontCompile $ TyRE Unit
+--     num = r "[0-9]"
+
+--     covering
+--     alphaNums : DontCompile $ TyRE String
+--     alphaNums = Group $ Rep $ alpha `or` num
+
+--     covering
+--     sepBy1 : TyRE a -> TyRE Unit -> TyRE (List1 a)
+--     sepBy1 re sep = (re <*> Rep (sep *> re)) `Conv` (\(MkPair x xs) => x ::: cast xs)
+
+--     litGo : TyRE Unit -> List Char -> TyRE Unit
+--     litGo acc [] = acc
+--     litGo acc (c :: cs) = litGo (Conv (acc <*> match c) (const MkUnit)) cs
+
+--     lit : String -> TyRE Unit
+--     lit s = ignore $ litGo Empty $ unpack s
+
+--     covering
+--     scheme : DontCompile $ TyRE String
+--     scheme = alphaNums <* lit "://"
+
+--     covering
+--     domain : DontCompile $ TyRE (List1 String)
+--     domain = sepBy1 alphaNums (lit ".")
+
+--     covering
+--     path : DontCompile $ TyRE (List String)
+--     path = rep0 (r "/" *> Group (Rep $ MatchChar $ Pred (/= '/')))
+
+--     covering
+--     urlRE : TyRE (Pair String (Pair (List1 String) (List String)))
+--     urlRE = scheme <*> (domain <*> path)
+
+--     -- staged : TyRE (String, List1 String, List String)
+--     -- staged = compileRE urlRE
+-- ]

@@ -8,7 +8,7 @@ import Data.SnocList
 
 infixr 6 <*>, <*, *>
 
-public export 
+public export
 data CharCond =
       OneOf (SortedSet Char)
     | Range (Char, Char)
@@ -84,7 +84,7 @@ oneOfChars xs = oneOfCharsList (unpack xs)
 
 public export
 match : Char -> TyRE ()
-match c = ignore $ oneOfCharsList [c]
+match c = ignore $ range c c
 
 public export
 rep0 : TyRE a -> TyRE (List a)
@@ -131,7 +131,7 @@ repFrom (S k) re = (\(e,l) => e::l) `map` (re <*> repFrom k re)
 public export
 repTo : Nat -> TyRE a -> TyRE (List a)
 repTo 0 re = const [] `map` empty
-repTo (S k) re = 
+repTo (S k) re =
   optionalAdd `map` (option re <*> repTo k re) where
     optionalAdd : (Maybe a, List a) -> List a
     optionalAdd (Nothing, xs) = xs

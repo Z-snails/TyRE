@@ -127,3 +127,9 @@ currentNS = do
 export
 (++) : Namespace -> Namespace -> Namespace
 MkNS xs ++ MkNS ys = MkNS (ys ++ xs)
+
+export
+stripImplicitHoles : TTImp -> TTImp
+stripImplicitHoles = mapTTImp $ \case
+    INamedApp _ f n (IHole _ _) => f
+    t => t

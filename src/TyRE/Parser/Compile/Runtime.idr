@@ -124,3 +124,7 @@ mkRight = mapTop Right
 export %inline
 mkSnoc : Interp (pre :< SnocList a :< a) (pre :< SnocList a)
 mkSnoc (stk :< sx :< x) _ = stk :< (sx :< x)
+
+public export
+DontCompile : Type -> Type
+DontCompile ty = ty
