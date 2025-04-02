@@ -3,6 +3,7 @@ module Data.Regex
 import public TyRE.StringRE
 import public TyRE.DisjointMatches
 import TyRE.Parser
+import Data.Maybe
 
 %default total
 

@@ -85,7 +85,7 @@ prettyOpts (o :: os) s =
             (ForeignFn ss) => ?dfghjk_7
             (ForeignExport ss) => ?dfghjk_8
             Invertible => ?dfghjk_9
-            (Totality treq) => "%\{show treq} "
+            (Totality treq) => show treq ++ " "
             Macro => "%macro "
             (SpecArgs nms) => ?dfghjk_12
     in o ++ prettyOpts os s
@@ -106,6 +106,21 @@ prettyApp p t =
     prettyArgument (Auto s) = "@{\{prettyTm Open s}}"
     prettyArgument (With s) = ?with_app
 
+isPair : TTImp -> Maybe (TTImp, TTImp)
+isPair (IApp _ (IApp _ (IVar _ `{Pair}) x) y) = Just (x, y)
+isPair _ = Nothing
+
+isMkPair : TTImp -> Maybe (TTImp, TTImp)
+isMkPair (IApp _ (IApp _ (IVar _ `{MkPair}) x) y) = Just (x, y)
+isMkPair _ = Nothing
+
+prettyAlternative : List TTImp -> Maybe String
+prettyAlternative [x, y] = do
+    (x, y) <- isPair x <* isMkPair y
+        <|> isMkPair x <* isPair y
+    Just "(\{prettyTm Open x}, \{prettyTm Open y})"
+prettyAlternative _ = Nothing
+
 prettyTm p (IVar fc nm) = showName nm
 prettyTm p (IPi fc rig pinfo mnm argTy retTy) =
     let n = maybe "_" showName mnm
@@ -117,7 +132,9 @@ prettyTm p (IPi fc rig pinfo mnm argTy retTy) =
 prettyTm p (ILam fc rig pinfo mnm argTy scope) =
     let n = maybe "_" showName mnm
     in showParens (p > Open) "\\ \{n} => \{prettyTm Open scope}"
-prettyTm p (ILet fc lhsFC rig nm nTy nVal scope) = ?dfghkj_3
+prettyTm p (ILet fc lhsFC rig nm nTy nVal scope) =
+    showParens (p > Open)
+        "let \{showCount rig $ showName nm} : \{prettyTm Open nTy} := \{prettyTm Open nVal} in \{prettyTm Open scope}"
 prettyTm p (ICase fc xs s ty cls) =
     let cls = showSep " ; " $ map (prettyClause "=>") cls
         scr = prettyTm Open s
@@ -133,9 +150,11 @@ prettyTm p t@(IApp _ _ _) = prettyApp p t
 prettyTm p t@(INamedApp _ _ _ _) = prettyApp p t
 prettyTm p t@(IAutoApp _ _ _) = prettyApp p t
 prettyTm p t@(IWithApp _ _ _) = prettyApp p t
-prettyTm p (ISearch fc depth) = ?dfgk
+prettyTm p (ISearch fc depth) = "%search"
 prettyTm p (IAlternative fc x [s]) = prettyTm p s
-prettyTm p (IAlternative fc x ss) = "_"
+prettyTm p (IAlternative fc x ss) = case prettyAlternative ss of
+    Just s => s
+    Nothing => ?alternative_not_supported
 prettyTm p (IRewrite fc s t) = ?dfghkj_13
 prettyTm p (IBindHere fc bm s) = ?dfghkj_14
 prettyTm p (IBindVar fc str) = str

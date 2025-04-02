@@ -6,8 +6,6 @@ import public Data.Either
 
 %default total
 
-%language ElabReflection
-
 public export
 data Stack : SnocList Type -> Type where
     Lin : Stack [< ]
