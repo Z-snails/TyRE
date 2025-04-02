@@ -4,6 +4,7 @@ import Language.Reflection
 import Data.SortedSet
 import Data.DPair
 import Data.SnocList
+import Data.Maybe
 
 import TyRE.Core
 import public TyRE.Parser.GroupThompson
@@ -13,14 +14,11 @@ import TyRE.Extra.Elab
 
 import Data.Regex
 import TyRE.StringRE
+import TyRE.Parser.Compile.DecisionTree
 
 %default total
 
 %language ElabReflection
-
-%hide TyRE.Core.infixr.(<*>)
-%hide TyRE.Core.infixr.(<*)
-%hide TyRE.Core.infixr.(*>)
 
 %hide TyRE.DisjointMatches.infix.(::)
 %hide TyRE.DisjointMatches.infix.(:<)
@@ -305,20 +303,17 @@ interpQ MkRight stk c = pure `(mkRight ~stk ~c)
 interpQ MkSnoc stk c = pure `(mkSnoc ~stk ~c)
 interpQ (MapTop f) stk c = quote f <&> \f => `(mapTop ~f ~stk ~c)
 
-showInstr : Instruction as bs -> Elab String
-showInstr GetChar = pure "GetChar"
-showInstr PushChar = pure "PushChar"
-showInstr Pack = pure "Pack"
-showInstr (Push x) = pure "Push"
-showInstr (x `Then` y) =
-    (\x, y => "\{x} \{y}")
-        <$> showInstr x
-        <*> showInstr y
-showInstr MkPair = pure "MkPair"
-showInstr MkLeft = pure "MkLeft"
-showInstr MkRight = pure "MkRight"
-showInstr MkSnoc = pure "MkSnoc"
-showInstr (MapTop f) = pure "MapTop"
+showInstr : Instruction as bs -> String
+showInstr GetChar = "GetChar"
+showInstr PushChar = "PushChar"
+showInstr Pack = "Pack"
+showInstr (Push x) = "Push"
+showInstr (x `Then` y) = showInstr x ++ " " ++ showInstr y
+showInstr MkPair = "MkPair"
+showInstr MkLeft = "MkLeft"
+showInstr MkRight = "MkRight"
+showInstr MkSnoc = "MkSnoc"
+showInstr (MapTop f) = "MapTop"
 
 state : TTImp
 state = `(Bits32)
@@ -332,6 +327,18 @@ asChar c = IPrimVal EmptyFC $ Ch c
 quoteStack : Stack as -> Elab TTImp
 quoteStack [<] = pure `([<])
 quoteStack (stk :< x) = (\stk, x => `(~stk :< ~x)) <$> quoteStack stk <*> quote x
+
+compileOp : Op Char -> TTImp -> TTImp
+compileOp (Lt x) c = `(c < ~(asChar x))
+compileOp (Lte x) c = `(c <= ~(asChar x))
+compileOp (Eq x) c = `(c == ~(asChar x))
+compileOp (Gte x) c = `(c >= ~(asChar x))
+compileOp OFalse c = `(False)
+compileOp OTrue c = `(True)
+
+compileDecTree : DecTree Char -> TTImp -> TTImp
+compileDecTree (Pure x) c = compileOp x c
+compileDecTree (If x y z) c = `(if ~(compileOp x c) then ~(compileDecTree y c) else ~(compileDecTree z c))
 
 parameters {0 t : Type} (sm : ReflectedSM t)
     mkLookup : Elab TTImp
@@ -362,9 +369,10 @@ parameters {0 t : Type} (sm : ReflectedSM t)
         let sq = asState $ sm.toInt s
         logMsg "tyre" 20 "      generate sat"
         sat <- case cond of
-            OneOf x => ?todo
+            OneOf xs => pure $ compileDecTree (makeDecTree xs) c
             Range (lo, hi) => pure `(~(asChar lo) <= ~c && ~c <= ~(asChar hi))
             Pred f => quote f <&> \f => `(~f ~c)
+            Any => pure `(True)
         let lhs = `(MkThread (Just ~sq) stk)
         logMsg "tyre" 20 "Compiling threads"
         threads <- traverse
@@ -372,8 +380,7 @@ parameters {0 t : Type} (sm : ReflectedSM t)
                 logMsg "tyre" 30 "\tAbout to quote next state"
                 let st2 = ttimpMaybe $ (asState . sm.toInt) <$> st2
                 logSugaredTerm "tyre" 25 "\tCompiling transition to" st2
-                is <- showInstr upd
-                logMsg "tyre" 35 "\tCompiling \{is}"
+                logMsg "tyre" 35 "\tCompiling \{showInstr upd}"
                 stk' <- interpQ upd `(Force stk) c
                 logMsg "tyre" 25 "\tCompiled instructions"
                 pure `(MkThread ~st2 (Delay ~stk')))
@@ -421,16 +428,16 @@ checkTerm t = case doCheck t of
     Left (fc, msg) => failAt fc msg
     Right _ => pure ()
   where
-    doCheck : TTImp -> Either (FC, String) ()
-    doCheck = ignore . mapMTTImp (\case
+    doCheck : TTImp -> Either (FC, String) TTImp
+    doCheck t = mapMTTImp (\case
         ILocal fc _ _ => Left (fc, "Unable to compile terms with local functions. Make these into top level functions")
         t@(IAlternative _ _ [_]) => Right t
         t@(IAlternative fc _ _) => Left (fc, "Unable to compile terms using some forms of overloading:\n  - (a, b) syntax for Pair and MkPair\n  - () syntax for Unit and MkUnit")
-        t => Right t)
+        t => Right t) t
 
 checkClause : Clause -> Elab ()
 checkClause (PatClause fc lhs rhs) = checkTerm lhs *> checkTerm rhs
-checkClause (WithClause fc lhs rig wval prf flags cls) = ?dfghk
+checkClause (WithClause fc lhs rig wval prf flags cls) = pure ()
 checkClause (ImpossibleClause fc lhs) = checkTerm lhs
 
 checkDecl : Decl -> Elab Decl
@@ -498,7 +505,8 @@ createTyREMod n imports ds = do
 
     let resTys = getTyREs ds
 
-    ds' <- traverse (rewriteDecl absTmpNS genNS resTys >=> checkDecl) ds
+    -- ds' <- traverse (rewriteDecl absTmpNS genNS resTys >=> checkDecl) ds
+    ds' <- traverse (rewriteDecl absTmpNS genNS resTys) ds
 
     let Just imports = traverse (map (\n => MkImport False n Nothing) . nameAsMod) imports
         | Nothing => fail "Invalid namespace in import list"
@@ -513,7 +521,7 @@ compileRE : TyRE t -> Elab (CompiledSM t)
 compileRE re = stage (compile re) >>= check
 
 %logging "tyre" 100
--- %logging "eval.stuck" 20
+-- %logging "eval.def.stuck" 20
 
 %runElab createTyREMod `{Generated} [] `[
     foo : Char -> Int
@@ -532,17 +540,21 @@ compileRE re = stage (compile re) >>= check
     f : Pair Char Char -> Nat
     f (MkPair c1 c2) = 10 * digit c1 + digit c2
 
-    export
-    timeRE : TyRE (SnocList (Pair Nat Nat))
-    timeRE = Rep $
-        Conv
-            ( (MatchChar (Range ('0', '1')) <*> MatchChar (Range ('0', '9')))
-            `or` (MatchChar (Range ('2', '2')) <*> MatchChar (Range ('0', '3')))
-            ) f
-        <* MatchChar (Range (':', ':'))
-        <*> Conv
-            (MatchChar (Range ('0', '5')) <*> MatchChar (Range ('0', '9')))
-            f
+    -- covering
+    -- abcd : TyRE ()
+    -- abcd = r "foo"
+
+    -- export
+    -- timeRE : TyRE (SnocList (Pair Nat Nat))
+    -- timeRE = Rep $
+    --     Conv
+    --         ( (MatchChar (Range ('0', '1')) <*> MatchChar (Range ('0', '9')))
+    --         `or` (MatchChar (Range ('2', '2')) <*> MatchChar (Range ('0', '3')))
+    --         ) f
+    --     <* MatchChar (Range (':', ':'))
+    --     <*> Conv
+    --         (MatchChar (Range ('0', '5')) <*> MatchChar (Range ('0', '9')))
+    --         f
 ]
 
 -- %runElab createTyREMod `{UrlRegex} [] `[

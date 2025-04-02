@@ -6,26 +6,27 @@ import public Data.SortedSet
 import public Data.List1
 import Data.SnocList
 
-infixr 6 <*>, <*, *>
+export infixr 2 `or`
 
 public export
 data CharCond =
       OneOf (SortedSet Char)
     | Range (Char, Char)
     | Pred (Char -> Bool)
+    | Any
 
 public export
 Eq CharCond where
-  (==) (OneOf x) (OneOf y) = x == y
-  (==) (OneOf x) _ = False
-  (==) (Range x) (Range y) = x == y
-  (==) (Range x) _ = False
-  (==) (Pred _) _ = False
+  OneOf x == OneOf y = x == y
+  Range x == Range y = x == y
+  Any == Any = True
+  _ == _ = False -- Includes Pred
 
 public export
 satisfies : CharCond -> Char -> Bool
 satisfies (OneOf xs) c = contains c xs
 satisfies (Range (x, y)) c = x <= c && c <= y
+satisfies Any _ = True
 satisfies (Pred f) c = f c
 
 public export
@@ -155,6 +156,14 @@ repTimes : (n : Nat)-> (re : TyRE a) -> TyRE (repTimesType n a)
 repTimes 0 re = empty
 repTimes 1 re = re
 repTimes (S (S k)) re = re <*> repTimes (S k) re
+
+public export
+sepBy1 : TyRE () -> TyRE a -> TyRE (List1 a)
+sepBy1 sep p = (\(x, xs) => x ::: xs) <$> (p <*> rep0 (sep *> p))
+
+public export
+sepBy : TyRE () -> TyRE a -> TyRE (List a)
+sepBy sep p = (forget <$> sepBy1 sep p) `or` (const [] <$> Empty)
 
 public export
 isConsuming : (re : TyRE a) -> Bool

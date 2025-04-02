@@ -10,22 +10,20 @@ modules =   TyRE.Codes
           , TyRE.Core
           , TyRE.RE
           , TyRE.StringRE
+          , TyRE.Hole
           -- typed parser
           , TyRE.Parser
           , TyRE.Parser.SM
           , TyRE.Parser.SMConstruction
           , TyRE.Parser.GroupThompson
+          , TyRE.Parser.Compile
+          , TyRE.Parser.Compile.Runtime
           --- additional more `generic` functions and structures
           , TyRE.Extra
+          , TyRE.Extra.Elab
+          , TyRE.Extra.Idris
           , TyRE.Extra.Pred
           , TyRE.Extra.Reflects
-          --- lexer copied from Idris 2 (all publicly exported)
-          , TyRE.Text.Lexer
-          , TyRE.Text.Lexer.Core
-          , TyRE.Text.Parser
-          , TyRE.Text.Parser.Core
-          , TyRE.Text.Quantity
-          , TyRE.Text.Token
           -- main export
           , Data.Regex
           -- examples

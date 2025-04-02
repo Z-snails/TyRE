@@ -9,28 +9,28 @@ import Data.Maybe
 ||| Simple email regex
 export
 email : TyRE (String, String, String)
-email = 
+email =
     let firstPart : TyRE String
-        firstPart = fastPack `map` rep1 ((letter `or` digitChar) `or` oneOfChars "%+_.-")
+        firstPart = rh "`({}|({}|[%\\+_\\.-]))+`" [letter, digit]
         secondPart : TyRE String
-        secondPart = (joinBy ".") `map` rep1 (fastPack `map` rep1 (letter `or` digitChar) <* match '.')
+        secondPart = joinBy "." . forget <$> sepBy1 (r ".") (rh "`({}|{})+`" [letter, digit])
         domain : TyRE String
         domain = fastPack `map` repFromTo 2 6 letter
-    in firstPart <*> (match '@' *> secondPart <*> domain)
+    in rh "{}@{}.{}" [firstPart, secondPart, domain]
 
 ---password validation
-data PasswordValidationError    = NoDigit 
-                                | NoCapitalLetter 
-                                | NoLowerCaseLetter 
-                                | NoSpecialCharacter 
+data PasswordValidationError    = NoDigit
+                                | NoCapitalLetter
+                                | NoLowerCaseLetter
+                                | NoSpecialCharacter
                                 | ContainsSpace
 
 passwordStrength : List ((TyRE (), PasswordValidationError))
 passwordStrength =
-    let hasDigit := r ".*[0-9].*"
-        hasCapitalLetter := r ".*[A-Z].*"
-        hasLowerCaseLetter := r ".*[a-z].*"
-        hasSpecialCharacter := r "[@#$<>%^&:=,_\\*\\+\\.\\?\\-\\!]"
+    let hasDigit := ignore $ r ".*[0-9].*"
+        hasCapitalLetter := ignore $ r ".*[A-Z].*"
+        hasLowerCaseLetter := ignore $ r ".*[a-z].*"
+        hasSpecialCharacter := ignore $ r "[@#$<>%^&:=,_\\*\\+\\.\\?\\-\\!]"
         doesntHaveSpaces := ignore $ rep0 $ predicate (/= ' ')
     in  [ (hasDigit, NoDigit)
         , (hasCapitalLetter, NoCapitalLetter)
@@ -39,10 +39,10 @@ passwordStrength =
         , (doesntHaveSpaces, ContainsSpace)
         ]
 
-||| Strong password validation 
+||| Strong password validation
 export
 validatePasswordSecurity : String -> List PasswordValidationError
-validatePasswordSecurity str = 
+validatePasswordSecurity str =
     passwordStrength >>= f where
         f : (TyRE (), PasswordValidationError) -> List PasswordValidationError
         f (tyre, error) = if match tyre str then [] else [error]
@@ -53,47 +53,44 @@ namespace UrlRegex
     record URL where
         constructor HTTP
         isSSL : Maybe Bool
-        host : (String, String)
+        domain : List1 String
         path : List String
-        query : Maybe (List (String, String))
+        query : Maybe (List1 (String, String))
         fragment : Maybe String
-        
+
     export
     Show URL where
-        show (HTTP isSSL (host, domain) path query fragment) = 
-            let protocol := 
+        show (HTTP isSSL domain path query fragment) =
+            let protocol :=
                     case isSSL of
                         Nothing => ""
                         (Just True) => "https://"
                         (Just False) => "http://"
+                domainPart = joinBy "." $ forget domain
                 pathPart := joinBy "/" path
-                queryPart := map ((joinBy "&") . (map (\case (p, v) => p ++ "=" ++ v))) query
-            in protocol ++ host ++ "." ++ domain ++ pathPart ++ fromMaybe "" queryPart ++ fromMaybe "" fragment
+                queryPart := joinBy "&" . (map (\(p, v) => p ++ "=" ++ v)) . forget <$> query
+            in protocol ++ domainPart ++ pathPart ++ fromMaybe "" queryPart ++ fromMaybe "" fragment
 
     export
     url : TyRE URL
-    url = (\case (pr, h, p, q, f) => HTTP pr h p q f) 
-          `map` 
-          (protocol <*> (host <*> (path <*> (query <*> fragment)))) where
-            digitLetterOr : String -> TyRE Char
-            digitLetterOr str = (digitChar `or` letter) `or` oneOfChars str
-            
-            protocol : TyRE (Maybe Bool)
-            protocol = r "((https?)!://(www)?)?"
+    url = (\(pr, h, p, q, f) => HTTP pr h p q f)
+          <$> rh "{}?{}{}(\\?{})?(#{})?" [protocol, domain, path, query, fragment]
+      where
+        urlSafeChar : TyRE Char
+        urlSafeChar = digitChar `or` letter `or` oneOfChars "_-"
 
-            host : TyRE (String, String)
-            host =  (fastPack `map` rep1 (digitLetterOr "@:%_~#=.+-\\"))
-                    <* match '.' 
-                    <*> (fastPack `map` repFromTo 1 6 (digitLetterOr "()"))
+        protocol : TyRE Bool
+        protocol = const False <$> r "http://"
+            `or` const True <$> r "https://"
 
-            path : TyRE (List String)
-            path = rep0 (match '/' *> (fastPack `map` rep1 (digitLetterOr "_-")))
+        domain : TyRE (List1 String)
+        domain = sepBy1 (r ".") (rh "`({}|{})+`" [letter, digit])
 
-            query : TyRE (Maybe (List (String, String)))
-            query = TyRE.Core.option $ match '?' 
-                        *> rep1 ((fastPack `map` rep1 (digitLetterOr "_-") 
-                            <* match '=') 
-                        <*> (fastPack `map` rep1 (digitLetterOr "_-")))
+        path : TyRE (List String)
+        path = rh "(/`{}`)*" [urlSafeChar]
 
-            fragment : TyRE (Maybe String)
-            fragment = TyRE.Core.option $ match '#' *> (fastPack `map` rep1 (digitLetterOr "_-"))
+        query : TyRE (List1 (String, String))
+        query = rh "(`{}+`=`{}+`)+" [urlSafeChar, urlSafeChar]
+
+        fragment : TyRE String
+        fragment = rh "`{}+`" [urlSafeChar]

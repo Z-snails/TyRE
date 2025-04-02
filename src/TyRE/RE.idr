@@ -72,12 +72,10 @@ isSemiUnit (Rep0 x) = True
 isSemiUnit (Rep1 x) = True
 
 mutual
-  ||| If condintion is satisfied show in parentheses
+  ||| If condition is satisfied show in parentheses
   public export
   pshow : (RE -> Bool) -> RE -> String
-  pshow condition re = if (condition re)
-                then showAux re
-                else "(" ++ showAux re ++ ")"
+  pshow condition re = showParens (condition re) (showAux re)
 
   public export
   showAux : RE -> String
@@ -172,35 +170,35 @@ mutual
     compileKeep (Concat re1 re2) | (CharC, (PairC x y)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (CharC, StringC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (CharC, UnitC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compileKeep re1 <* (compileKeep re2)
     compileKeep (Concat re1 re2) | (CharC, (EitherC x y)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (CharC, (MaybeC x)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (CharC, BoolC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (CharC, (ListC z)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (CharC, NatC) = concatTyREKeep re1 re2
-    compileKeep (Concat re1 re2) | (CharC, IgnoreC) = 
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+    compileKeep (Concat re1 re2) | (CharC, IgnoreC) =
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compileKeep re1 <* (compileKeep re2)
     compileKeep (Concat re1 re2) | ((PairC x y), CharC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((PairC x y), (PairC z w)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((PairC x y), StringC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((PairC x y), UnitC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compileKeep re1 <* (compileKeep re2)
     compileKeep (Concat re1 re2) | ((PairC x y), (EitherC z w)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((PairC x y), (MaybeC z)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((PairC x y), BoolC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((PairC x y), (ListC z)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((PairC x y), NatC) = concatTyREKeep re1 re2
-    compileKeep (Concat re1 re2) | ((PairC x y), IgnoreC) = 
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+    compileKeep (Concat re1 re2) | ((PairC x y), IgnoreC) =
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compileKeep re1 <* (compileKeep re2)
     compileKeep (Concat re1 re2) | (StringC, CharC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (StringC, (PairC x y)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (StringC, StringC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (StringC, UnitC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compileKeep re1 <* (compileKeep re2)
     compileKeep (Concat re1 re2) | (StringC, (EitherC x y)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (StringC, (MaybeC x)) = concatTyREKeep re1 re2
@@ -208,39 +206,39 @@ mutual
     compileKeep (Concat re1 re2) | (StringC, (ListC z)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (StringC, NatC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (StringC, IgnoreC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compileKeep re1 <* (compileKeep re2)
     compileKeep (Concat re1 re2) | (UnitC, CharC) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compileKeep re1 *> (compileKeep re2)
     compileKeep (Concat re1 re2) | (UnitC, (PairC x y)) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compileKeep re1 *> (compileKeep re2)
     compileKeep (Concat re1 re2) | (UnitC, StringC) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compileKeep re1 *> (compileKeep re2)
     compileKeep (Concat re1 re2) | (UnitC, UnitC) = ignore (concatTyREKeep re1 re2)
     compileKeep (Concat re1 re2) | (UnitC, (EitherC x y)) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compileKeep re1 *> (compileKeep re2)
     compileKeep (Concat re1 re2) | (UnitC, (MaybeC x)) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compileKeep re1 *> (compileKeep re2)
     compileKeep (Concat re1 re2) | (UnitC, BoolC) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compileKeep re1 *> (compileKeep re2)
     compileKeep (Concat re1 re2) | (UnitC, (ListC z)) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compileKeep re1 *> (compileKeep re2)
     compileKeep (Concat re1 re2) | (UnitC, NatC) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compileKeep re1 *> (compileKeep re2)
     compileKeep (Concat re1 re2) | (UnitC, IgnoreC) = ignore (concatTyREKeep re1 re2)
     compileKeep (Concat re1 re2) | ((EitherC x y), CharC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((EitherC x y), (PairC z w)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((EitherC x y), StringC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((EitherC x y), UnitC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compileKeep re1 <* (compileKeep re2)
     compileKeep (Concat re1 re2) | ((EitherC x y), (EitherC z w)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((EitherC x y), (MaybeC z)) = concatTyREKeep re1 re2
@@ -248,88 +246,88 @@ mutual
     compileKeep (Concat re1 re2) | ((EitherC x y), (ListC z)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((EitherC x y), NatC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((EitherC x y), IgnoreC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compileKeep re1 <* (compileKeep re2)
     compileKeep (Concat re1 re2) | ((MaybeC x), CharC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((MaybeC x), (PairC y z)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((MaybeC x), StringC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((MaybeC x), UnitC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compileKeep re1 <* compileKeep re2
     compileKeep (Concat re1 re2) | ((MaybeC x), (EitherC y z)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((MaybeC x), (MaybeC y)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((MaybeC x), BoolC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((MaybeC x), (ListC z)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((MaybeC x), NatC) = concatTyREKeep re1 re2
-    compileKeep (Concat re1 re2) | ((MaybeC x), IgnoreC) = 
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+    compileKeep (Concat re1 re2) | ((MaybeC x), IgnoreC) =
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compileKeep re1 <* compileKeep re2
     compileKeep (Concat re1 re2) | (BoolC, CharC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (BoolC, (PairC x y)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (BoolC, StringC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (BoolC, UnitC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compileKeep re1 <* compileKeep re2
     compileKeep (Concat re1 re2) | (BoolC, (EitherC x y)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (BoolC, (MaybeC x)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (BoolC, BoolC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (BoolC, (ListC z)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (BoolC, NatC) = concatTyREKeep re1 re2
-    compileKeep (Concat re1 re2) | (BoolC, IgnoreC) = 
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+    compileKeep (Concat re1 re2) | (BoolC, IgnoreC) =
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compileKeep re1 <* compileKeep re2
     compileKeep (Concat re1 re2) | ((ListC z), CharC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((ListC z), (PairC x y)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((ListC z), StringC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((ListC z), UnitC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compileKeep re1 <* compileKeep re2
     compileKeep (Concat re1 re2) | ((ListC z), (EitherC x y)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((ListC z), (MaybeC x)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((ListC z), BoolC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((ListC z), (ListC x)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | ((ListC z), NatC) = concatTyREKeep re1 re2
-    compileKeep (Concat re1 re2) | ((ListC z), IgnoreC) = 
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+    compileKeep (Concat re1 re2) | ((ListC z), IgnoreC) =
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compileKeep re1 <* (compileKeep re2)
     compileKeep (Concat re1 re2) | (NatC, CharC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (NatC, (PairC x y)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (NatC, StringC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (NatC, UnitC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compileKeep re1 <* compileKeep re2
     compileKeep (Concat re1 re2) | (NatC, (EitherC x y)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (NatC, (MaybeC x)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (NatC, BoolC) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (NatC, (ListC z)) = concatTyREKeep re1 re2
     compileKeep (Concat re1 re2) | (NatC, NatC) = concatTyREKeep re1 re2
-    compileKeep (Concat re1 re2) | (NatC, IgnoreC) = 
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+    compileKeep (Concat re1 re2) | (NatC, IgnoreC) =
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compileKeep re1 <* compileKeep re2
-    compileKeep (Concat re1 re2) | (IgnoreC, CharC) = 
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+    compileKeep (Concat re1 re2) | (IgnoreC, CharC) =
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compileKeep re1 *> compileKeep re2
-    compileKeep (Concat re1 re2) | (IgnoreC, (PairC x y)) = 
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+    compileKeep (Concat re1 re2) | (IgnoreC, (PairC x y)) =
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compileKeep re1 *> compileKeep re2
-    compileKeep (Concat re1 re2) | (IgnoreC, StringC) = 
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+    compileKeep (Concat re1 re2) | (IgnoreC, StringC) =
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compileKeep re1 *> compileKeep re2
     compileKeep (Concat re1 re2) | (IgnoreC, UnitC) = ignore (compileKeep re1 <*> compileKeep re2)
-    compileKeep (Concat re1 re2) | (IgnoreC, (EitherC x y)) = 
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+    compileKeep (Concat re1 re2) | (IgnoreC, (EitherC x y)) =
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compileKeep re1 *> compileKeep re2
-    compileKeep (Concat re1 re2) | (IgnoreC, (MaybeC x)) = 
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+    compileKeep (Concat re1 re2) | (IgnoreC, (MaybeC x)) =
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compileKeep re1 *> compileKeep re2
     compileKeep (Concat re1 re2) | (IgnoreC, BoolC) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compileKeep re1 *> compileKeep re2
     compileKeep (Concat re1 re2) | (IgnoreC, (ListC z)) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compileKeep re1 *> compileKeep re2
     compileKeep (Concat re1 re2) | (IgnoreC, NatC) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compileKeep re1 *> compileKeep re2
     compileKeep (Concat re1 re2) | (IgnoreC, IgnoreC) = ignore (compileKeep re1 <*> compileKeep re2)
 
@@ -472,7 +470,7 @@ mutual
     compileKeep (Rep0 re) | IgnoreC = ignore (Rep (compileKeep re))
 
   compileKeep (Rep1 re) with (SimplifyCode (CodeShapeREKeep re)) proof p
-    compileKeep (Rep1 re) | CharC = 
+    compileKeep (Rep1 re) | CharC =
       (rewrite p in (\(c,l) => [< c] ++ l)) `map` cre <*> Rep cre where
         cre : TyRE $ TypeREKeep re
         cre = compileKeep re
@@ -535,35 +533,35 @@ mutual
     compile (Concat re1 re2) | (CharC, (PairC x y)) = concatTyRE re1 re2
     compile (Concat re1 re2) | (CharC, StringC) = concatTyRE re1 re2
     compile (Concat re1 re2) | (CharC, UnitC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compile re1 <* (compile re2)
     compile (Concat re1 re2) | (CharC, (EitherC x y)) = concatTyRE re1 re2
     compile (Concat re1 re2) | (CharC, (MaybeC x)) = concatTyRE re1 re2
     compile (Concat re1 re2) | (CharC, BoolC) = concatTyRE re1 re2
     compile (Concat re1 re2) | (CharC, (ListC z)) = concatTyRE re1 re2
     compile (Concat re1 re2) | (CharC, NatC) = concatTyRE re1 re2
-    compile (Concat re1 re2) | (CharC, IgnoreC) = 
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+    compile (Concat re1 re2) | (CharC, IgnoreC) =
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compile re1 <* (compile re2)
     compile (Concat re1 re2) | ((PairC x y), CharC) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((PairC x y), (PairC z w)) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((PairC x y), StringC) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((PairC x y), UnitC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compile re1 <* (compile re2)
     compile (Concat re1 re2) | ((PairC x y), (EitherC z w)) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((PairC x y), (MaybeC z)) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((PairC x y), BoolC) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((PairC x y), (ListC z)) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((PairC x y), NatC) = concatTyRE re1 re2
-    compile (Concat re1 re2) | ((PairC x y), IgnoreC) = 
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+    compile (Concat re1 re2) | ((PairC x y), IgnoreC) =
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compile re1 <* (compile re2)
     compile (Concat re1 re2) | (StringC, CharC) = concatTyRE re1 re2
     compile (Concat re1 re2) | (StringC, (PairC x y)) = concatTyRE re1 re2
     compile (Concat re1 re2) | (StringC, StringC) = concatTyRE re1 re2
     compile (Concat re1 re2) | (StringC, UnitC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compile re1 <* (compile re2)
     compile (Concat re1 re2) | (StringC, (EitherC x y)) = concatTyRE re1 re2
     compile (Concat re1 re2) | (StringC, (MaybeC x)) = concatTyRE re1 re2
@@ -571,39 +569,39 @@ mutual
     compile (Concat re1 re2) | (StringC, (ListC z)) = concatTyRE re1 re2
     compile (Concat re1 re2) | (StringC, NatC) = concatTyRE re1 re2
     compile (Concat re1 re2) | (StringC, IgnoreC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compile re1 <* (compile re2)
     compile (Concat re1 re2) | (UnitC, CharC) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compile re1 *> (compile re2)
     compile (Concat re1 re2) | (UnitC, (PairC x y)) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compile re1 *> (compile re2)
     compile (Concat re1 re2) | (UnitC, StringC) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compile re1 *> (compile re2)
     compile (Concat re1 re2) | (UnitC, UnitC) = ignore (concatTyRE re1 re2)
     compile (Concat re1 re2) | (UnitC, (EitherC x y)) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compile re1 *> (compile re2)
     compile (Concat re1 re2) | (UnitC, (MaybeC x)) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compile re1 *> (compile re2)
     compile (Concat re1 re2) | (UnitC, BoolC) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compile re1 *> (compile re2)
     compile (Concat re1 re2) | (UnitC, (ListC z)) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compile re1 *> (compile re2)
     compile (Concat re1 re2) | (UnitC, NatC) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compile re1 *> (compile re2)
     compile (Concat re1 re2) | (UnitC, IgnoreC) = ignore (concatTyRE re1 re2)
     compile (Concat re1 re2) | ((EitherC x y), CharC) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((EitherC x y), (PairC z w)) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((EitherC x y), StringC) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((EitherC x y), UnitC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compile re1 <* (compile re2)
     compile (Concat re1 re2) | ((EitherC x y), (EitherC z w)) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((EitherC x y), (MaybeC z)) = concatTyRE re1 re2
@@ -611,88 +609,88 @@ mutual
     compile (Concat re1 re2) | ((EitherC x y), (ListC z)) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((EitherC x y), NatC) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((EitherC x y), IgnoreC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compile re1 <* (compile re2)
     compile (Concat re1 re2) | ((MaybeC x), CharC) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((MaybeC x), (PairC y z)) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((MaybeC x), StringC) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((MaybeC x), UnitC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compile re1 <* compile re2
     compile (Concat re1 re2) | ((MaybeC x), (EitherC y z)) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((MaybeC x), (MaybeC y)) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((MaybeC x), BoolC) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((MaybeC x), (ListC z)) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((MaybeC x), NatC) = concatTyRE re1 re2
-    compile (Concat re1 re2) | ((MaybeC x), IgnoreC) = 
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+    compile (Concat re1 re2) | ((MaybeC x), IgnoreC) =
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compile re1 <* compile re2
     compile (Concat re1 re2) | (BoolC, CharC) = concatTyRE re1 re2
     compile (Concat re1 re2) | (BoolC, (PairC x y)) = concatTyRE re1 re2
     compile (Concat re1 re2) | (BoolC, StringC) = concatTyRE re1 re2
     compile (Concat re1 re2) | (BoolC, UnitC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compile re1 <* compile re2
     compile (Concat re1 re2) | (BoolC, (EitherC x y)) = concatTyRE re1 re2
     compile (Concat re1 re2) | (BoolC, (MaybeC x)) = concatTyRE re1 re2
     compile (Concat re1 re2) | (BoolC, BoolC) = concatTyRE re1 re2
     compile (Concat re1 re2) | (BoolC, (ListC z)) = concatTyRE re1 re2
     compile (Concat re1 re2) | (BoolC, NatC) = concatTyRE re1 re2
-    compile (Concat re1 re2) | (BoolC, IgnoreC) = 
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+    compile (Concat re1 re2) | (BoolC, IgnoreC) =
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compile re1 <* compile re2
     compile (Concat re1 re2) | ((ListC z), CharC) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((ListC z), (PairC x y)) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((ListC z), StringC) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((ListC z), UnitC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compile re1 <* compile re2
     compile (Concat re1 re2) | ((ListC z), (EitherC x y)) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((ListC z), (MaybeC x)) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((ListC z), BoolC) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((ListC z), (ListC x)) = concatTyRE re1 re2
     compile (Concat re1 re2) | ((ListC z), NatC) = concatTyRE re1 re2
-    compile (Concat re1 re2) | ((ListC z), IgnoreC) = 
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+    compile (Concat re1 re2) | ((ListC z), IgnoreC) =
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compile re1 <* (compile re2)
     compile (Concat re1 re2) | (NatC, CharC) = concatTyRE re1 re2
     compile (Concat re1 re2) | (NatC, (PairC x y)) = concatTyRE re1 re2
     compile (Concat re1 re2) | (NatC, StringC) = concatTyRE re1 re2
     compile (Concat re1 re2) | (NatC, UnitC) =
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compile re1 <* compile re2
     compile (Concat re1 re2) | (NatC, (EitherC x y)) = concatTyRE re1 re2
     compile (Concat re1 re2) | (NatC, (MaybeC x)) = concatTyRE re1 re2
     compile (Concat re1 re2) | (NatC, BoolC) = concatTyRE re1 re2
     compile (Concat re1 re2) | (NatC, (ListC z)) = concatTyRE re1 re2
     compile (Concat re1 re2) | (NatC, NatC) = concatTyRE re1 re2
-    compile (Concat re1 re2) | (NatC, IgnoreC) = 
-      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p) 
+    compile (Concat re1 re2) | (NatC, IgnoreC) =
+      replace {p = (\s => TyRE (Sem s))} (fst $ pairEq p)
       $ compile re1 <* compile re2
-    compile (Concat re1 re2) | (IgnoreC, CharC) = 
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+    compile (Concat re1 re2) | (IgnoreC, CharC) =
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compile re1 *> compile re2
-    compile (Concat re1 re2) | (IgnoreC, (PairC x y)) = 
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+    compile (Concat re1 re2) | (IgnoreC, (PairC x y)) =
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compile re1 *> compile re2
-    compile (Concat re1 re2) | (IgnoreC, StringC) = 
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+    compile (Concat re1 re2) | (IgnoreC, StringC) =
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compile re1 *> compile re2
     compile (Concat re1 re2) | (IgnoreC, UnitC) = ignore (compile re1 <*> compile re2)
-    compile (Concat re1 re2) | (IgnoreC, (EitherC x y)) = 
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+    compile (Concat re1 re2) | (IgnoreC, (EitherC x y)) =
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compile re1 *> compile re2
-    compile (Concat re1 re2) | (IgnoreC, (MaybeC x)) = 
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+    compile (Concat re1 re2) | (IgnoreC, (MaybeC x)) =
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compile re1 *> compile re2
     compile (Concat re1 re2) | (IgnoreC, BoolC) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compile re1 *> compile re2
     compile (Concat re1 re2) | (IgnoreC, (ListC z)) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compile re1 *> compile re2
     compile (Concat re1 re2) | (IgnoreC, NatC) =
-      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p) 
+      replace {p = (\s => TyRE (Sem s))} (snd $ pairEq p)
       $ compile re1 *> compile re2
     compile (Concat re1 re2) | (IgnoreC, IgnoreC) = ignore (compile re1 <*> compile re2)
 
