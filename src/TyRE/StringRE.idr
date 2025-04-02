@@ -1,200 +1,191 @@
 module TyRE.StringRE
 
-import public Data.Maybe
+import Data.SortedSet
+import Data.SnocList
+import Data.Either
+import Data.Vect
 
-import public TyRE.Codes
-import public TyRE.Core
 import public TyRE.RE
-import public TyRE.Text.Lexer
-import public TyRE.Text.Parser
+import public TyRE.Core
+import public TyRE.Codes
+
+%default total
+
+namespace Raw
+    public export
+    data RawHoleRE
+        = Exactly Char
+        | OneOf (List Char)
+        | To Char Char
+        | Any
+        | Hole
+        | Concat RawHoleRE RawHoleRE
+        | Alt RawHoleRE RawHoleRE
+        | Maybe RawHoleRE
+        | Group RawHoleRE
+        | Rep0 RawHoleRE
+        | Rep1 RawHoleRE
+        | Keep RawHoleRE
+
+data HoleRE : Nat -> Type where
+    Exactly : Char -> HoleRE 0
+    OneOf : List Char -> HoleRE 0
+    To : Char -> Char -> HoleRE 0
+    Any : HoleRE 0
+    Hole : HoleRE 1
+    Concat : {l : Nat} -> HoleRE l -> HoleRE r -> HoleRE (l + r)
+    Alt : {l : Nat} -> HoleRE l -> HoleRE r -> HoleRE (l + r)
+    Maybe : HoleRE h -> HoleRE h
+    Group : HoleRE h -> HoleRE h
+    Rep0 : HoleRE h -> HoleRE h
+    Rep1 : HoleRE h -> HoleRE h
+    Keep : HoleRE h -> HoleRE h
 
 public export
-data Token =
-              OParQ -- [
-            | CParQ -- ]
-            | OPar -- (
-            | CPar -- )
-            | Dot -- .
-            | BackTic -- `
-            | Dash -- -
-            | Star -- *
-            | Plus -- +
-            | QMark -- ?
-            | Alt -- |
-            | Exclamation
-            | CharLit String
-            | End -- end of input
+hole : RawHoleRE -> (h ** HoleRE h)
+hole (Exactly c) = (_ ** Exactly c)
+hole (OneOf cs) = (_ ** OneOf cs)
+hole (To x y) = (_ ** To x y)
+hole Any = (_ ** Any)
+hole Hole = (_ ** Hole)
+hole (Concat l r) =
+    let (_ ** l) = hole l
+        (_ ** r) = hole r
+    in (_ ** Concat l r)
+hole (Alt l r) =
+    let (_ ** l) = hole l
+        (_ ** r) = hole r
+    in (_ ** Alt l r)
+hole (Maybe x) = let (_ ** x) = hole x in (_ ** Maybe x)
+hole (Group x) = let (_ ** x) = hole x in (_ ** Group x)
+hole (Rep0 x) = let (_ ** x) = hole x in (_ ** Rep0 x)
+hole (Rep1 x) = let (_ ** x) = hole x in (_ ** Rep1 x)
+hole (Keep x) = let (_ ** x) = hole x in (_ ** Keep x)
 
-||| character literal:
-|||   c -- for non special characters
-|||   \c -- can be for both special and non special characters
-public export
-reCharLit : Lexer
-reCharLit = (non $ some $ oneOf specialChars) <|> (is '\\' <+> any)
-
-public export
-reTokenMap : TokenMap Token
-reTokenMap = [
-              (is '[',    \x => OParQ),
-              (is ']',    \x => CParQ),
-              (is '(',    \x => OPar),
-              (is ')',    \x => CPar),
-              (is '.',    \x => Dot),
-              (is '`',    \x => BackTic),
-              (is '-',    \x => Dash),
-              (is '*',    \x => Star),
-              (is '+',    \x => Plus),
-              (is '?',    \x => QMark),
-              (is '|',    \x => Alt),
-              (is '!',    \x => Exclamation),
-              (reCharLit, \x => CharLit x)
-              ]
+unhole : HoleRE h -> Vect h RE -> RE
+unhole (Exactly x) _ = Exactly x
+unhole (OneOf xs) _ = OneOf xs
+unhole (To x y) _ = To x y
+unhole Any _ = Any
+unhole Hole [x] = x
+unhole (Concat {l} x y) xs =
+    let (ls, rs) = splitAt l xs
+    in Concat (unhole x ls) (unhole y rs)
+unhole (Alt {l} x y) xs =
+    let (ls, rs) = splitAt l xs
+    in Alt (unhole x ls) (unhole y rs)
+unhole (Maybe x) xs = Maybe (unhole x xs)
+unhole (Group x) xs = Group (unhole x xs)
+unhole (Rep0 x) xs = Rep0 (unhole x xs)
+unhole (Rep1 x) xs = Rep1 (unhole x xs)
+unhole (Keep x) xs = Keep (unhole x xs)
 
 public export
-Rule : Type -> Type
-Rule ty = Grammar (TokenData Token) True ty
-
------ terminals -----
-public export
-openParQ : Rule ()
-openParQ = terminal "[" (\case {(MkToken _ _  OParQ) => Just (); _ => Nothing})
+data Result a = Ok a (List Char) | Err String
 
 public export
-closedParQ : Rule ()
-closedParQ = terminal "]" (\case {(MkToken _ _  CParQ) => Just (); _ => Nothing})
+Functor Result where
+    map f (Ok x cs) = Ok (f x) cs
+    map f (Err s) = Err s
+
+private infixl 1 >>>
+
+public export %tcinline
+(>>>) : Result a -> (a -> List Char -> Result b) -> Result b
+Ok a cs >>> f = f a cs
+Err x >>> f = Err x
 
 public export
-openPar : Rule ()
-openPar = terminal "(" (\case {(MkToken _ _  OPar) => Just (); _ => Nothing})
+unexpectedEOI : Result a
+unexpectedEOI = Err "Unexpected end of input"
 
 public export
-closedPar : Rule ()
-closedPar = terminal ")" (\case {(MkToken _ _  CPar) => Just (); _ => Nothing})
+fullRE : List Char -> Result RE
 
 public export
-backTic : Rule ()
-backTic = terminal "`" (\case {(MkToken _ _  BackTic) => Just (); _ => Nothing})
+isSpecialChar : Char -> Bool
+isSpecialChar c = case c of
+    '(' => True; ')' => True
+    '[' => True; ']' => True
+    '|' => True; '?' => True
+    '+' => True; '*' => True
+    '.' => True; '!' => True
+    _ => False
+
+public export %tcinline
+charLit : List Char -> Result Char
+charLit [] = unexpectedEOI
+charLit ('\\' :: c :: cs) = Ok c cs
+charLit (c :: cs) = if isSpecialChar c then Err "Unexpected special character" else Ok c cs
 
 public export
-dash : Rule ()
-dash = terminal "-" (\case {(MkToken _ _  Dash) => Just (); _ => Nothing})
+oneOf : List Char -> SnocList Char -> Result (SnocList Char)
+oneOf (']' :: cs) acc = Ok acc cs
+oneOf [] acc = Err "Unclosed ["
+oneOf cs acc = charLit cs >>> \c, cs' => oneOf (assert_smaller cs cs') (acc :< c)
 
 public export
-dot : Rule ()
-dot = terminal "." (\case {(MkToken _ _  Dot) => Just (); _ => Nothing})
+unit : List Char -> Result RE
+unit ('.' :: cs) = Ok Any cs
+unit ('[' :: a :: '-' :: b :: ']' :: cs) = Ok (To a b) cs
+unit ('[' :: cs) = OneOf . cast <$> oneOf cs [<]
+unit ('`' :: cs) = fullRE cs >>> \re, cs => case cs of
+    '`' :: cs => Ok (Group re) cs
+    _ => Err "Unclosed `"
+unit ('(' :: cs) = fullRE cs >>> \re, cs => case cs of
+    ')' :: cs => Ok re cs
+    _ => Err "Unclosed ("
+unit cs = Exactly <$> charLit cs
 
 public export
-star : Rule ()
-star = terminal "*" (\case {(MkToken _ _  Star) => Just (); _ => Nothing})
+postUnit : Char -> Maybe (RE -> RE)
+postUnit '?' = Just Maybe
+postUnit '+' = Just Rep1
+postUnit '*' = Just Rep0
+postUnit '!' = Just Keep
+postUnit _ = Nothing
 
 public export
-plus : Rule ()
-plus = terminal "+" (\case {(MkToken _ _  Plus) => Just (); _ => Nothing})
+semiUnit : List Char -> Result RE
+semiUnit cs = unit cs >>> \x, cs => case cs of
+    (c :: cs) => case postUnit c of
+        Just f => Ok (f x) cs
+        Nothing => Ok x (c :: cs)
+    _ => Ok x cs
 
 public export
-qMark : Rule ()
-qMark = terminal "?" (\case {(MkToken _ _  QMark) => Just (); _ => Nothing})
+postSemiUnit : List Char -> Result (RE -> RE)
+postSemiUnit ('|' :: cs) = Alt <$> semiUnit cs
+postSemiUnit cs = Concat <$> fullRE cs
+
+fullRE cs = semiUnit cs >>> \x, cs' => case postSemiUnit (assert_smaller cs cs') of
+    Ok f cs => Ok (f x) cs
+    Err e => Ok x cs'
 
 public export
-alt : Rule ()
-alt = terminal "|" (\case {(MkToken _ _  Alt) => Just (); _ => Nothing})
+reWithEnd : List Char -> Result RE
+reWithEnd cs = fullRE cs >>> \x, cs => case cs of
+    [] => Ok x []
+    _ => Err "Expected end of input"
 
 public export
-end : Rule ()
-end = terminal "" (\case {(MkToken _ _  End) => Just (); _ => Nothing})
+rAux : String -> Either String RE
+rAux str = case reWithEnd (unpack str) of
+    Ok x _ => Right x
+    Err x => Left x
 
 public export
-exclamation : Rule ()
-exclamation = terminal "!" (\case {(MkToken _ _  Exclamation) => Just (); _ => Nothing})
+fromRight : (x : Either a b) -> {auto 0 isRight : IsRight x} -> b
+fromRight (Right x) = x
+fromRight (Left x) {isRight = ItIsRight} impossible
 
 public export
-getCharLit : (TokenData Token) -> Maybe Char
-getCharLit (MkToken _ _ (CharLit str)) with (unpack str)
-  getCharLit (MkToken _ _ (CharLit str)) | [] = Nothing --should not happen
-  getCharLit (MkToken _ _ (CharLit str)) | (c :: []) = Just c
-  getCharLit (MkToken _ _ (CharLit str)) | ('\\' :: (c :: [])) = Just c
-  getCharLit (MkToken _ _ (CharLit str)) | ('\\' :: (c :: (c' :: cs))) = Nothing --should not happen
-  getCharLit (MkToken _ _ (CharLit str)) | (c :: (c' :: cs)) = Nothing --should not happen
-getCharLit _ = Nothing
+toRE : (str : String) -> {auto 0 isRight : IsRight (rAux str)} -> RE
+toRE str {isRight} = fromRight (rAux str) @{isRight}
 
 public export
-charLit : Rule Char
-charLit = terminal "char" getCharLit
+r : (str : String) -> {auto 0 isRight : IsRight (rAux str)} -> TyRE (TypeRE (toRE str {isRight}))
+r str {isRight} = compile $ toRE str {isRight}
 
------ grammar -----
-public export
-charLitsRep : Rule (List Char)
-charLitsRep = (map (::) charLit <*> charLitsRep) <|> (map (\x => [x]) charLit)
-
-public export
-oneOf : Rule RE
-oneOf = map OneOf $ openParQ *> charLitsRep <* closedParQ
-
-public export
-range : Rule RE
-range = (map To ((openParQ *> charLit) <* dash) <*> charLit) <* closedParQ
-
-public export
-exactly : Rule RE
-exactly = map Exactly charLit
-
-public export
-any : Rule RE
-any = map (\_ => Any) dot
-
-public export
-mapRE : RE -> Maybe (RE -> RE) -> RE
-mapRE re Nothing = re
-mapRE re (Just f) = f re
-
-mutual
-  public export
-  unit  : Rule RE
-  unit  = exactly <|> any <|> oneOf <|> range -- single character patterns
-        <|> (map Group $ backTic *> fullRE <* backTic) -- group
-        <|> (openPar *> fullRE <* closedPar) -- with paranthesis
-
-  public export
-  postUnit  : Rule (RE -> RE)
-  postUnit  = (map (\_ => Maybe) qMark) -- ...?
-            <|> (map (\_ => Rep1) plus) -- ...+
-            <|> (map (\_ => Rep0) star) -- ...*
-            <|> (map (\_ => Keep) exclamation) -- ...!
-
-  public export
-  semiUnit : Rule RE
-  semiUnit = map mapRE unit <*> optional (postUnit)
-
-  public export
-  postSemiUnit : Rule (RE -> RE)
-  postSemiUnit =  (map (\y => \x => Alt x y) (alt *> semiUnit)) -- ...|A
-              <|> (map (\y => \x => Concat x y) fullRE) -- ...ABC
-
-  public export
-  fullRE : Rule RE
-  fullRE =  map mapRE semiUnit <*> optional (postSemiUnit)
-
-public export
-reWithEnd : Rule RE
-reWithEnd = fullRE <* end
-
---- parsing ---
-
-public export
-mapTokens : (List (TokenData Token), (Int, Int, String))
-          -> List (TokenData Token)
-mapTokens (tokens, (f, l, _)) = tokens ++ [MkToken f l End]
-
-public export
-rAux : String -> Maybe RE
-rAux str = case (parse reWithEnd (mapTokens (lex reTokenMap str))) of
-                    Right (reg, _) => Just reg
-                    Left _ => Nothing
-
-public export
-toRE : (str : String) -> {auto isJust : IsJust (rAux str)} -> RE
-toRE str {isJust} = fromJust (rAux str) @{isJust}
-
-public export
-r : (str : String) -> {auto isJust : IsJust (rAux str)} -> TyRE (TypeRE $ toRE str {isJust})
-r str {isJust} = compile (toRE str {isJust})
+foo : TyRE Bool
+foo = r "(foo)!|(bah)!"
