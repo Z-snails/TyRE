@@ -1,0 +1,5 @@
+[custom.all.ilex]
+type = "github"
+url = "https://github.com/stefan-hoeck/idris2-ilex"
+commit = "b6b60ae43f6bd9a7ff0597303c8df2218d9bad00"
+ipkg = "ilex.ipkg"

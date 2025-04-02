@@ -1,8 +1,11 @@
 .PHONY: all
 all: build run graph
 
+Staging/ILexGenerated.idr: Staging/ILex.idr
+	./Staging/gen.sh
+
 .PHONY: build
-build:
+build: Staging/ILexGenerated.idr
 	idris2 --find-ipkg Main.idr -o bench
 
 .PHONY: run

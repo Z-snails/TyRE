@@ -5,34 +5,35 @@ import TyRE.Core
 import TyRE.StringRE
 import Benchmark
 import TyRE.Parser
+import Staging.ILexGenerated
 
--- Staging.Regexes:22:4--22:45
+-- Staging.Regexes:24:4--24:45
 private repA : DontCompile (TyRE (SnocList Unit))
 repA = Rep (match (fromChar 'a'))
 
--- Staging.Regexes:25:4--25:32
+-- Staging.Regexes:27:4--27:32
 private repA' : CompiledSM (SnocList Unit)
 repA' = MkCompiledSM Bits32 (\ st => case st of { 0 => Prelude.Basics.(:<) {a = Type} (Prelude.Types.SnocList.(++) {a = Type} (Prelude.Basics.(:<) {a = Type} (Prelude.Basics.Lin {a = Type}) (Prelude.Basics.SnocList Builtin.Unit)) (Prelude.Basics.Lin {a = Type})) (Prelude.Basics.SnocList Char) ; _ => Lin }) ((::) (MkThread Nothing ((:<) Lin (Prelude.Basics.Lin {a = Builtin.Unit}))) ((::) (MkThread (Just 0) ((:<) ((:<) Lin (Prelude.Basics.Lin {a = Builtin.Unit})) (Prelude.Basics.Lin {a = Char}))) Nil)) (\ td => \ c => case td of { MkThread (Just 0) stk => case (&&) ((<=) 'a' c) ((<=) c 'a') of { True => (::) (MkThread (Just 0) (Delay ((:<) (mkSnoc (mapTop (\ mn_9460__ => Builtin.MkUnit) (pack (Force stk) c) c) c) (Prelude.Basics.Lin {a = Char})))) Nil ; False => Nil } ; _ => Nil })
 
--- Staging.Regexes:28:4--28:55
+-- Staging.Regexes:30:4--30:55
 private time : DontCompile (TyRE (SnocList (Pair Nat Nat)))
 time = Rep ((<*>) ((<*) (Conv (Group (or ((<*>) (range (fromChar '0') (fromChar '1')) (range (fromChar '0') (fromChar '9'))) ((<*>) (range (fromChar '2') (fromChar '2')) (range (fromChar '0') (fromChar '3'))))) cast) (match (fromChar ':'))) (Conv (Group ((<*>) (range (fromChar '0') (fromChar '5')) (range (fromChar '0') (fromChar '9')))) cast))
 
--- Staging.Regexes:34:4--34:42
+-- Staging.Regexes:36:4--36:42
 private time' : CompiledSM (SnocList (Pair Nat Nat))
 time' = MkCompiledSM Bits32 (\ st => case st of { 0 => Prelude.Basics.(:<) {a = Type} (Prelude.Types.SnocList.(++) {a = Type} (Prelude.Basics.(:<) {a = Type} (Prelude.Basics.Lin {a = Type}) (Prelude.Basics.SnocList (Builtin.Pair Prelude.Types.Nat Prelude.Types.Nat))) (Prelude.Basics.Lin {a = Type})) (Prelude.Basics.SnocList Char) ; 1 => Prelude.Basics.(:<) {a = Type} (Prelude.Types.SnocList.(++) {a = Type} (Prelude.Basics.(:<) {a = Type} (Prelude.Basics.Lin {a = Type}) (Prelude.Basics.SnocList (Builtin.Pair Prelude.Types.Nat Prelude.Types.Nat))) (Prelude.Basics.Lin {a = Type})) (Prelude.Basics.SnocList Char) ; 2 => Prelude.Basics.(:<) {a = Type} (Prelude.Types.SnocList.(++) {a = Type} (Prelude.Basics.(:<) {a = Type} (Prelude.Basics.Lin {a = Type}) (Prelude.Basics.SnocList (Builtin.Pair Prelude.Types.Nat Prelude.Types.Nat))) (Prelude.Basics.Lin {a = Type})) (Prelude.Basics.SnocList Char) ; 3 => Prelude.Basics.(:<) {a = Type} (Prelude.Types.SnocList.(++) {a = Type} (Prelude.Basics.(:<) {a = Type} (Prelude.Basics.Lin {a = Type}) (Prelude.Basics.SnocList (Builtin.Pair Prelude.Types.Nat Prelude.Types.Nat))) (Prelude.Basics.Lin {a = Type})) (Prelude.Basics.SnocList Char) ; 4 => Prelude.Basics.(:<) {a = Type} (Prelude.Types.SnocList.(++) {a = Type} (Prelude.Basics.(:<) {a = Type} (Prelude.Basics.Lin {a = Type}) (Prelude.Basics.SnocList (Builtin.Pair Prelude.Types.Nat Prelude.Types.Nat))) (Prelude.Types.SnocList.(++) {a = Type} (Prelude.Basics.(:<) {a = Type} (Prelude.Basics.Lin {a = Type}) Prelude.Types.Nat) (Prelude.Basics.Lin {a = Type}))) (Prelude.Basics.SnocList Char) ; 5 => Prelude.Basics.(:<) {a = Type} (Prelude.Types.SnocList.(++) {a = Type} (Prelude.Basics.(:<) {a = Type} (Prelude.Basics.Lin {a = Type}) (Prelude.Basics.SnocList (Builtin.Pair Prelude.Types.Nat Prelude.Types.Nat))) (Prelude.Types.SnocList.(++) {a = Type} (Prelude.Basics.(:<) {a = Type} (Prelude.Basics.Lin {a = Type}) Prelude.Types.Nat) (Prelude.Basics.Lin {a = Type}))) (Prelude.Basics.SnocList Char) ; 6 => Prelude.Basics.(:<) {a = Type} (Prelude.Types.SnocList.(++) {a = Type} (Prelude.Basics.(:<) {a = Type} (Prelude.Basics.Lin {a = Type}) (Prelude.Basics.SnocList (Builtin.Pair Prelude.Types.Nat Prelude.Types.Nat))) (Prelude.Types.SnocList.(++) {a = Type} (Prelude.Basics.(:<) {a = Type} (Prelude.Basics.Lin {a = Type}) Prelude.Types.Nat) (Prelude.Basics.Lin {a = Type}))) (Prelude.Basics.SnocList Char) ; _ => Lin }) ((::) (MkThread Nothing ((:<) Lin (Prelude.Basics.Lin {a = Builtin.Pair Prelude.Types.Nat Prelude.Types.Nat}))) ((::) (MkThread (Just 0) ((:<) ((:<) Lin (Prelude.Basics.Lin {a = Builtin.Pair Prelude.Types.Nat Prelude.Types.Nat})) (Prelude.Basics.Lin {a = Char}))) ((::) (MkThread (Just 2) ((:<) ((:<) Lin (Prelude.Basics.Lin {a = Builtin.Pair Prelude.Types.Nat Prelude.Types.Nat})) (Prelude.Basics.Lin {a = Char}))) Nil))) (\ td => \ c => case td of { MkThread (Just 0) stk => case (&&) ((<=) '0' c) ((<=) c '1') of { True => (::) (MkThread (Just 1) (Delay (pushChar (Force stk) c))) Nil ; False => Nil } ; MkThread (Just 1) stk => case (&&) ((<=) '0' c) ((<=) c '9') of { True => (::) (MkThread (Just 4) (Delay ((:<) (mapTop (\ mn_0_arg => Prelude.Cast.cast mn_0_arg) (pack (Force stk) c) c) (Prelude.Basics.Lin {a = Char})))) Nil ; False => Nil } ; MkThread (Just 2) stk => case (&&) ((<=) '2' c) ((<=) c '2') of { True => (::) (MkThread (Just 3) (Delay (pushChar (Force stk) c))) Nil ; False => Nil } ; MkThread (Just 3) stk => case (&&) ((<=) '0' c) ((<=) c '3') of { True => (::) (MkThread (Just 4) (Delay ((:<) (mapTop (\ mn_0_arg => Prelude.Cast.cast mn_0_arg) (pack (Force stk) c) c) (Prelude.Basics.Lin {a = Char})))) Nil ; False => Nil } ; MkThread (Just 4) stk => case (&&) ((<=) ':' c) ((<=) c ':') of { True => (::) (MkThread (Just 5) (Delay ((:<) (mapTop (Builtin.fst {a = Prelude.Types.Nat} {b = Builtin.Unit}) (mkPair (mapTop (\ mn_9460__ => Builtin.MkUnit) (pack (Force stk) c) c) c) c) (Prelude.Basics.Lin {a = Char})))) Nil ; False => Nil } ; MkThread (Just 5) stk => case (&&) ((<=) '0' c) ((<=) c '5') of { True => (::) (MkThread (Just 6) (Delay (pushChar (Force stk) c))) Nil ; False => Nil } ; MkThread (Just 6) stk => case (&&) ((<=) '0' c) ((<=) c '9') of { True => (::) (MkThread (Just 0) (Delay ((:<) (mkSnoc (mkPair (mapTop (\ mn_0_arg => Prelude.Cast.cast mn_0_arg) (pack (Force stk) c) c) c) c) (Prelude.Basics.Lin {a = Char})))) ((::) (MkThread (Just 2) (Delay ((:<) (mkSnoc (mkPair (mapTop (\ mn_0_arg => Prelude.Cast.cast mn_0_arg) (pack (Force stk) c) c) c) c) (Prelude.Basics.Lin {a = Char})))) Nil) ; False => Nil } ; _ => Nil })
 
--- Staging.Regexes:37:4--37:53
+-- Staging.Regexes:39:4--39:53
 private genAInput : (_ : Nat) -> (_ : Maybe (List Char)) -> List Char
 genAInput _ (Just xs) = (::) (fromChar 'a') xs
 genAInput k _ = replicate ((*) k (fromInteger 1000)) (fromChar 'a')
 
--- Staging.Regexes:41:4--41:56
+-- Staging.Regexes:43:4--43:56
 private genTimeInput : (_ : Nat) -> (_ : Maybe (List Char)) -> List Char
 genTimeInput _ (Just xs) = (++) (unpack (fromString "12:55")) xs
 genTimeInput k _ = concat (List.replicate ((*) k (fromInteger 100)) (unpack (fromString "12:55")))
 
--- Staging.Regexes:45:4--46:38
+-- Staging.Regexes:47:4--48:38
 export stagingBenchmarks : List Benchmark
-stagingBenchmarks = (::) (MkBench (fromString "staging.rep_a_interp") genAInput ((.) pure (parseFull repA))) ((::) (MkBench (fromString "staging.rep_a_compile") genAInput ((.) pure (parseFull repA'))) ((::) (MkBench (fromString "staging.time_interp") genTimeInput ((.) pure (parseFull time))) ((::) (MkBench (fromString "staging.time_compile") genTimeInput ((.) pure (parseFull time'))) Nil)))
+stagingBenchmarks = (::) (MkBench (fromString "staging.rep_a_interp") genAInput ((.) pure (parseFull repA))) ((::) (MkBench (fromString "staging.rep_a_compile") genAInput ((.) pure (parseFull repA'))) ((::) (MkBench (fromString "staging.rep_a_ilex") genAInput ((.) pure lexRepA1)) ((::) (MkBench (fromString "staging.time_interp") genTimeInput ((.) pure (parseFull time))) ((::) (MkBench (fromString "staging.time_compile") genTimeInput ((.) pure (parseFull time'))) ((::) (MkBench (fromString "staging.time_ilex") genTimeInput ((.) pure lexTimes1)) Nil)))))
 

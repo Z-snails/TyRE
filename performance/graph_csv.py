@@ -103,6 +103,7 @@ graphs = [
         LINES: [
             {PATH: "staging.rep_a_interp.csv", LABEL: "a* interpreted", COLOR: "blue"},
             {PATH: "staging.rep_a_compile.csv", LABEL: "a* staged", COLOR: "red"},
+            {PATH: "staging.rep_a_ilex.csv", LABEL: "a* ILex", COLOR: "green"},
         ],
         XLABEL: "size of input",
         XSCALE: 1000,
@@ -112,6 +113,7 @@ graphs = [
         LINES: [
             {PATH: "staging.time_interp.csv", LABEL: "interpreted", COLOR: "blue"},
             {PATH: "staging.time_compile.csv", LABEL: "staged", COLOR: "red"},
+            {PATH: "staging.time_ilex.csv", LABEL: "a* ILex", COLOR: "green"},
         ],
         XLABEL: "length of word",
         XSCALE: 5,

@@ -13,13 +13,15 @@ import Data.DPair
 
 import Data.Regex
 import TyRE.StringRE
+import Staging.ILexGenerated
+import Text.ILex.Util
 
 import Benchmark
 
 %language ElabReflection
 
 %runElab createTyREMod `{Staging.Generated}
-    [`{TyRE.Core}, `{TyRE.StringRE}, `{Benchmark}, `{TyRE.Parser}] `[
+    [`{TyRE.Core}, `{TyRE.StringRE}, `{Benchmark}, `{TyRE.Parser}, `{Staging.ILexGenerated}] `[
     repA : DontCompile $ TyRE (SnocList Unit)
     repA = Rep $ match 'a'
 
@@ -48,7 +50,9 @@ import Benchmark
     stagingBenchmarks =
         [ MkBench "staging.rep_a_interp" genAInput (pure . parseFull repA)
         , MkBench "staging.rep_a_compile" genAInput (pure . parseFull repA')
+        , MkBench "staging.rep_a_ilex" genAInput (pure . lexRepA1)
         , MkBench "staging.time_interp" genTimeInput (pure . parseFull time)
         , MkBench "staging.time_compile" genTimeInput (pure . parseFull time')
+        , MkBench "staging.time_ilex" genTimeInput (pure . lexTimes1)
         ]
 ]
