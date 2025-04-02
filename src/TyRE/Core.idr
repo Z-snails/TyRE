@@ -99,6 +99,15 @@ public export
 rep1l1 : TyRE a -> TyRE (List1 a)
 rep1l1 tyre = (\(e,l) => e:::l) `map` (tyre <*> rep0 tyre)
 
+||| Count occurances of a regular expression
+public export
+count0 : TyRE a -> TyRE Nat
+count0 tyre = length <$> Rep (ignore tyre)
+
+public export
+count1 : TyRE a -> TyRE Nat
+count1 tyre = (\(_, xs) => 1 + length xs) <$> (ignore tyre <*> Rep (ignore tyre))
+
 public export
 option : TyRE a -> TyRE (Maybe a)
 option tyre = (\e => case e of {(Left x) => Just x ; (Right _) => Nothing}) `map` tyre <|> empty
