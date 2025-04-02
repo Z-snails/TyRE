@@ -8,7 +8,7 @@ import public Data.DPair
 import public TyRE.RE
 import public TyRE.Core
 import public TyRE.Codes
-import public TyRE.Hole
+import public TyRE.RE
 
 %default total
 
