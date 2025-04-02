@@ -10,7 +10,6 @@ modules =   TyRE.Codes
           , TyRE.Core
           , TyRE.RE
           , TyRE.StringRE
-          , TyRE.Hole
           -- typed parser
           , TyRE.Parser
           , TyRE.Parser.SM
