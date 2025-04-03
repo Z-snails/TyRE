@@ -28,10 +28,6 @@ Ok a cs >>> f = f a cs
 Err x >>> f = Err x
 
 public export
-unexpectedEOI : Result a
-unexpectedEOI = Err "Unexpected end of input"
-
-public export
 fullRE : List Char -> Result SomeHoleRE
 
 public export
@@ -46,7 +42,7 @@ isSpecialChar c = case c of
 
 public export %tcinline
 charLit : List Char -> Result Char
-charLit [] = unexpectedEOI
+charLit [] = Err "Unexpected end of input"
 charLit ('\\' :: c :: cs) = Ok c cs
 charLit (c :: cs) = if isSpecialChar c then Err "Unexpected special character" else Ok c cs
 
