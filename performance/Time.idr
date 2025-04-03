@@ -16,7 +16,7 @@ autoRE = Rep $
     f : (Char, Char) -> Nat
     f (c1, c2) = 10 * digit c1 + digit c2
 
-manualRE : TyRE (SnocList (String, String))
+manualRE : TyRE (List (String, String))
 manualRE = r "(`([01][0-9])|([2][0-3])`:`[0-5][0-9]`)*"
 
 extract : (String, String) -> (Nat, Nat)

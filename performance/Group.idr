@@ -2,6 +2,7 @@ module Group
 
 import Data.Regex
 import Data.Either
+import Data.Nat
 
 import Text.Lexer
 import Text.Parser.Core
@@ -11,9 +12,6 @@ import Benchmark
 import Data.Regex
 
 import Syntax.PreorderReasoning
-
-%hide TyRE.StringRE.Rule
-%hide TyRE.Text.Lexer.Core.TokenMap
 
 data Div2View : Nat -> Type where
   Even : {0 n : Nat} -> (k : Nat) -> {auto 0 ford : n = k + k} -> Div2View n

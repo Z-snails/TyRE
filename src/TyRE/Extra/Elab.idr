@@ -2,7 +2,7 @@ module TyRE.Extra.Elab
 
 import Language.Reflection
 import Data.String
-import Data.Maybe
+import public Data.Maybe
 
 public export
 isModPart : String -> Bool
@@ -39,6 +39,7 @@ ttimpMaybe : Maybe TTImp -> TTImp
 ttimpMaybe (Just x) = `(Just ~x)
 ttimpMaybe Nothing = `(Nothing)
 
+export
 mapVar : (Name -> Name) -> TTImp -> TTImp
 mapVar upd = mapTTImp $ \case
     IVar fc n => IVar fc (upd n)

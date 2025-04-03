@@ -7,7 +7,6 @@ import public Data.DPair
 
 import public TyRE.RE
 import public TyRE.Core
-import public TyRE.Codes
 import public TyRE.RE
 
 %default total
@@ -29,16 +28,6 @@ Err x >>> f = Err x
 
 public export
 fullRE : List Char -> Result SomeHoleRE
-
-public export
-isSpecialChar : Char -> Bool
-isSpecialChar c = case c of
-    '(' => True; ')' => True
-    '[' => True; ']' => True
-    '|' => True; '?' => True
-    '+' => True; '*' => True
-    '.' => True; '!' => True
-    _ => False
 
 public export %tcinline
 charLit : List Char -> Result Char

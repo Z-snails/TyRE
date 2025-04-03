@@ -6,6 +6,16 @@ import Data.Maybe
 
 import TyRE.Core
 
+public export
+isSpecialChar : Char -> Bool
+isSpecialChar c = case c of
+    '(' => True; ')' => True
+    '[' => True; ']' => True
+    '|' => True; '?' => True
+    '+' => True; '*' => True
+    '.' => True; '!' => True
+    _ => False
+
 ||| An untyped regular expression indexed by the
 ||| number of holes it contains
 public export
@@ -22,6 +32,10 @@ data HoleRE : Nat -> Type where
     HKeep : HoleRE n -> HoleRE n
 
 public export
+RE : Type
+RE = HoleRE 0
+
+public export
 SomeHoleRE : Type
 SomeHoleRE = (h ** HoleRE h)
 
@@ -34,6 +48,44 @@ lift2 :
     ({n, m : Nat} -> HoleRE n -> HoleRE m -> HoleRE (n + m)) ->
     SomeHoleRE -> SomeHoleRE -> SomeHoleRE
 lift2 f (_ ** x) (_ ** y) = (_ ** f x y)
+
+isUnit : HoleRE n -> Bool
+isUnit (HExactly _) = True
+isUnit (HMatch cond) = True
+isUnit Hole = True
+isUnit (HGroup _) = True
+isUnit _ = False
+
+isSemiUnit : HoleRE n -> Bool
+isSemiUnit (HConcat _ _) = False
+isSemiUnit (HAlt _ _) = False
+isSemiUnit _ = True
+
+showChar : Char -> String
+showChar c = if isSpecialChar c then "\\" ++ cast c else cast c
+
+showAux : HoleRE n -> String
+
+pshow : (HoleRE n -> Bool) -> HoleRE n -> String
+pshow cond r = showParens (not $ cond r) $ showAux r
+
+showAux (HExactly c) = showChar c
+showAux (HMatch (OneOf x)) = "[" ++ concat (showChar <$> Prelude.toList x) ++ "]"
+showAux (HMatch (Range (x, y))) = concat ["[", showChar x, "-", showChar y, "]"]
+showAux (HMatch (Pred f)) = "<predicate>"
+showAux (HMatch Any) = "."
+showAux Hole = "{}"
+showAux (HConcat x y) = pshow isSemiUnit x ++ showAux y
+showAux (HAlt x y) = pshow isSemiUnit x ++ "|" ++ pshow isSemiUnit y
+showAux (HMaybe x) = pshow isSemiUnit x ++ "?"
+showAux (HGroup x) = "`" ++ showAux x ++ "`"
+showAux (HRep0 x) = pshow isSemiUnit x ++ "*"
+showAux (HRep1 x) = pshow isSemiUnit x ++ "+"
+showAux (HKeep x) = pshow isSemiUnit x ++ "!"
+
+export
+Show (HoleRE n) where
+    show = showAux
 
 ||| An untyped regular expression that embeds typed regular
 ||| expressions

@@ -49,10 +49,10 @@ import Benchmark
     stagingBenchmarks : List Benchmark
     stagingBenchmarks =
         [ MkBench "staging.rep_a_interp" genAInput (pure . parseFull repA)
-        , MkBench "staging.rep_a_compile" genAInput (pure . parseFull repA')
+        -- , MkBench "staging.rep_a_compile" genAInput (pure . parseFull repA')
         , MkBench "staging.rep_a_ilex" genAInput (pure . lexRepA1)
         , MkBench "staging.time_interp" genTimeInput (pure . parseFull time)
-        , MkBench "staging.time_compile" genTimeInput (pure . parseFull time')
+        -- , MkBench "staging.time_compile" genTimeInput (pure . parseFull time')
         , MkBench "staging.time_ilex" genTimeInput (pure . lexTimes1)
         ]
 ]
