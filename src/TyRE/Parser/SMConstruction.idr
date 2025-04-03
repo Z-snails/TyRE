@@ -10,7 +10,7 @@ import TyRE.Parser.GroupThompson
 ||| Compile function creates a state machine from an untyped regex
 export
 compile : {0 a : Type} -> (tyre : TyRE a) -> SM a
---sm for empty language
+--sm for language consisting of the empty word
 compile Empty =
   let lookup : Void -> SnocList Type
       lookup _ impossible
