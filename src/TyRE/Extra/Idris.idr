@@ -114,11 +114,27 @@ isMkPair : TTImp -> Maybe (TTImp, TTImp)
 isMkPair (IApp _ (IApp _ (IVar _ `{MkPair}) x) y) = Just (x, y)
 isMkPair _ = Nothing
 
-prettyAlternative : List TTImp -> Maybe String
-prettyAlternative [x, y] = do
+tryPair : TTImp -> TTImp -> Maybe String
+tryPair x y = do
     (x, y) <- isPair x <* isMkPair y
         <|> isMkPair x <* isPair y
     Just "(\{prettyTm Open x}, \{prettyTm Open y})"
+
+isUnit : TTImp -> Bool
+isUnit (IVar _ `{Unit}) = True
+isUnit _ = False
+
+isMkUnit : TTImp -> Bool
+isMkUnit (IVar _ `{MkUnit}) = True
+isMkUnit _ = False
+
+tryUnit : TTImp -> TTImp -> Maybe String
+tryUnit x y = if (isUnit x && isMkUnit y) || (isMkUnit x && isUnit y)
+    then Just "()"
+    else Nothing
+
+prettyAlternative : List TTImp -> Maybe String
+prettyAlternative [x, y] = tryPair x y <|> tryUnit x y
 prettyAlternative _ = Nothing
 
 prettyTm p (IVar fc nm) = showName nm
