@@ -7,7 +7,6 @@ import public Data.DPair
 
 import public TyRE.RE
 import public TyRE.Core
-import public TyRE.RE
 
 %default total
 
@@ -45,7 +44,7 @@ public export
 unit : List Char -> Result SomeHoleRE
 unit ('.' :: cs) = Ok (_ ** HMatch Any) cs
 unit ('[' :: a :: '-' :: b :: ']' :: cs) = Ok (_ ** HMatch (Range (a, b))) cs
-unit ('[' :: cs) = (\cs => (_ ** HMatch $ OneOf (fromList $ cast cs))) <$> oneOf cs [<]
+unit ('[' :: cs) = (\cs => (_ ** HMatch $ OneOf (cast cs))) <$> oneOf cs [<]
 unit ('`' :: cs) = fullRE cs >>> \(_ ** re), cs => case cs of
     '`' :: cs => Ok (_ ** HGroup re) cs
     _ => Err "Unclosed `"

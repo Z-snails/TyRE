@@ -25,9 +25,14 @@ compile (MatchChar f) =
       lookup () = [< ]
       init : InitStatesType Char () lookup
       init = [(Just () ** [<] `Element` [<])]
+      sat := case f of
+          OneOf xs =>
+            let xs = SortedSet.fromList xs
+            in \c => contains c xs
+          _ => \c => satisfies f c
       next : TransitionRelation Char () lookup
       next () c =
-        if satisfies f c
+        if sat c
         then [(Nothing ** [< PushChar])]
         else []
   in MkSM () lookup init next

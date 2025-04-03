@@ -14,7 +14,7 @@ import TyRE.Extra.Elab
 
 import Data.Regex
 import TyRE.StringRE
-import TyRE.Parser.Compile.DecisionTree
+import TyRE.RE
 
 %default total
 
@@ -328,17 +328,10 @@ quoteStack : Stack as -> Elab TTImp
 quoteStack [<] = pure `([<])
 quoteStack (stk :< x) = (\stk, x => `(~stk :< ~x)) <$> quoteStack stk <*> quote x
 
-compileOp : Op Char -> TTImp -> TTImp
-compileOp (Lt x) c = `(c < ~(asChar x))
-compileOp (Lte x) c = `(c <= ~(asChar x))
-compileOp (Eq x) c = `(c == ~(asChar x))
-compileOp (Gte x) c = `(c >= ~(asChar x))
-compileOp OFalse c = `(False)
-compileOp OTrue c = `(True)
-
-compileDecTree : DecTree Char -> TTImp -> TTImp
-compileDecTree (Pure x) c = compileOp x c
-compileDecTree (If x y z) c = `(if ~(compileOp x c) then ~(compileDecTree y c) else ~(compileDecTree z c))
+compileOneOf : List Char -> TTImp -> TTImp
+compileOneOf cs c =
+    let clauses = map (\c => PatClause EmptyFC (asChar c) `(True)) cs ++ [PatClause EmptyFC `(_) `(False)]
+    in ICase EmptyFC [] c `(Char) clauses
 
 parameters {0 t : Type} (sm : ReflectedSM t)
     mkLookup : Elab TTImp
@@ -369,7 +362,7 @@ parameters {0 t : Type} (sm : ReflectedSM t)
         let sq = asState $ sm.toInt s
         logMsg "tyre" 20 "      generate sat"
         sat <- case cond of
-            OneOf xs => pure $ compileDecTree (makeDecTree xs) c
+            OneOf xs => pure $ compileOneOf xs c
             Range (lo, hi) => pure `(~(asChar lo) <= ~c && ~c <= ~(asChar hi))
             Pred f => quote f <&> \f => `(~f ~c)
             Any => pure `(True)
@@ -521,7 +514,6 @@ compileRE : TyRE t -> Elab (CompiledSM t)
 compileRE re = stage (compile re) >>= check
 
 %logging "tyre" 100
--- %logging "eval.def.stuck" 20
 
 %runElab createTyREMod `{Generated} [] `[
     foo : Char -> Int
@@ -540,9 +532,11 @@ compileRE re = stage (compile re) >>= check
     f : Pair Char Char -> Nat
     f (MkPair c1 c2) = 10 * digit c1 + digit c2
 
-    -- covering
+    abcd : TyRE Char
+    abcd = r "[abcd]!"
+
     -- abcd : TyRE ()
-    -- abcd = r "foo"
+    -- abcd = r "foo|(bah)"
 
     -- export
     -- timeRE : TyRE (SnocList (Pair Nat Nat))

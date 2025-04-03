@@ -5,12 +5,13 @@ import public Data.Either
 import public Data.SortedSet
 import public Data.List1
 import Data.SnocList
+import Data.Maybe
 
 export infixr 2 `or`
 
 public export
 data CharCond =
-      OneOf (SortedSet Char)
+      OneOf (List Char)
     | Range (Char, Char)
     | Pred (Char -> Bool)
     | Any
@@ -24,7 +25,7 @@ Eq CharCond where
 
 public export
 satisfies : CharCond -> Char -> Bool
-satisfies (OneOf xs) c = contains c xs
+satisfies (OneOf xs) c = isJust $ find (== c) xs
 satisfies (Range (x, y)) c = x <= c && c <= y
 satisfies Any _ = True
 satisfies (Pred f) c = f c
@@ -77,7 +78,7 @@ digitChar = range '0' '9'
 
 public export
 oneOfCharsList : List Char -> TyRE Char
-oneOfCharsList xs = MatchChar (OneOf (fromList xs))
+oneOfCharsList xs = MatchChar (OneOf xs)
 
 public export
 oneOfChars : String -> TyRE Char

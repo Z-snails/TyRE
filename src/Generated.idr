@@ -2,23 +2,27 @@
 module Generated
 import TyRE.Parser.Compile.Runtime
 
--- TyRE.Parser.Compile:526:4--526:21
+-- TyRE.Parser.Compile:518:4--518:21
 private foo : (_ : Char) -> Int
 foo c = (-) (ord c) (fromInteger 10)
 
--- TyRE.Parser.Compile:529:4--530:18
+-- TyRE.Parser.Compile:521:4--522:18
 export bah : CompiledSM Int
 bah = MkCompiledSM Bits32 (\ st => case st of { 0 => Prelude.Basics.Lin {a = Type} ; _ => Lin }) ((::) (MkThread (Just 0) Lin) Nil) (\ td => \ c => case td of { MkThread (Just 0) stk => case (&&) ((<=) 'a' c) ((<=) c 'z') of { True => (::) (MkThread Nothing (Delay (mapTop Generated.foo ((:<) (Force stk) c) c))) Nil ; False => Nil } ; _ => Nil })
 
--- TyRE.Parser.Compile:533:4--533:22
+-- TyRE.Parser.Compile:525:4--525:22
 private bah2 : CompiledSM String
 bah2 = MkCompiledSM Bits32 (\ st => case st of { 0 => Prelude.Basics.(:<) {a = Type} (Prelude.Basics.Lin {a = Type}) (Prelude.Basics.SnocList Char) ; 1 => Prelude.Basics.(:<) {a = Type} (Prelude.Basics.Lin {a = Type}) (Prelude.Basics.SnocList Char) ; 2 => Prelude.Basics.(:<) {a = Type} (Prelude.Basics.Lin {a = Type}) (Prelude.Basics.SnocList Char) ; _ => Lin }) ((::) (MkThread Nothing ((:<) Lin "")) ((::) (MkThread (Just 0) ((:<) Lin (Prelude.Basics.Lin {a = Char}))) ((::) (MkThread (Just 1) ((:<) Lin (Prelude.Basics.Lin {a = Char}))) Nil))) (\ td => \ c => case td of { MkThread (Just 0) stk => case (&&) ((<=) 'a' c) ((<=) c 'z') of { True => (::) (MkThread Nothing (Delay (pack (Force stk) c))) ((::) (MkThread (Just 0) (Delay (pushChar (Force stk) c))) ((::) (MkThread (Just 1) (Delay (pushChar (Force stk) c))) Nil)) ; False => Nil } ; MkThread (Just 1) stk => case (&&) ((<=) 'g' c) ((<=) c 'h') of { True => (::) (MkThread (Just 2) (Delay (pushChar (Force stk) c))) Nil ; False => Nil } ; MkThread (Just 2) stk => case (&&) ((<=) 'i' c) ((<=) c 'j') of { True => (::) (MkThread Nothing (Delay (pack (Force stk) c))) ((::) (MkThread (Just 0) (Delay (pushChar (Force stk) c))) ((::) (MkThread (Just 1) (Delay (pushChar (Force stk) c))) Nil)) ; False => Nil } ; _ => Nil })
 
--- TyRE.Parser.Compile:536:4--536:23
+-- TyRE.Parser.Compile:528:4--528:23
 private digit : (_ : Char) -> Nat
 digit c = minus (cast c) (cast (fromChar '0'))
 
--- TyRE.Parser.Compile:539:4--539:29
+-- TyRE.Parser.Compile:531:4--531:29
 private f : (_ : Pair Char Char) -> Nat
 f (MkPair c1 c2) = (+) ((*) (fromInteger 10) (digit c1)) (digit c2)
+
+-- TyRE.Parser.Compile:534:4--534:20
+private abcd : CompiledSM Char
+abcd = MkCompiledSM Bits32 (\ st => case st of { 0 => Prelude.Basics.Lin {a = Type} ; _ => Lin }) ((::) (MkThread (Just 0) Lin) Nil) (\ td => \ c => case td of { MkThread (Just 0) stk => case case c of { 'a' => True ; 'b' => True ; 'c' => True ; 'd' => True ; _ => False } of { True => (::) (MkThread Nothing (Delay ((:<) (Force stk) c))) Nil ; False => Nil } ; _ => Nil })
 
