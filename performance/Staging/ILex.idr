@@ -37,7 +37,7 @@ times = many time >>> eoi
     pairNatNat = mlift (\x, y => (x, y))
 
     time : forall is. Expr True LexErr is (is :< (Nat, Nat))
-    time = hour >>> minute >>> arr2 pairNatNat
+    time = hour >>> chr_ ':' >>> minute >>> arr2 pairNatNat
 
 main : IO ()
 main = do

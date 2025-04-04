@@ -30,9 +30,9 @@ import Benchmark
 
     time : DontCompile $ TyRE (SnocList (Pair Nat Nat))
     time = Rep $
-        Conv (Group $ (range '0' '1' <*> range '0' '9') `or` (range '2' '2' <*> range '0' '3')) cast
+        Conv (r "`([01][0-9])|(2[0-3])`") cast
         <* match ':'
-        <*> Conv (Group $ range '0' '5' <*> range '0' '9') cast
+        <*> Conv (r "`[0-5][0-9]`") cast
 
     time' : TyRE (SnocList (Pair Nat Nat))
     time' = time

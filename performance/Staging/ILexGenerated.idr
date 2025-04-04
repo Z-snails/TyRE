@@ -50,7 +50,10 @@ public export
 lexTimes6 : List Char -> Nat -> SnocList (Pair Nat Nat) -> Either LexErr (SnocList (Pair Nat Nat))
 
 public export
-lexTimes7 : List Char -> Nat -> Char -> SnocList (Pair Nat Nat) -> Either LexErr (SnocList (Pair Nat Nat))
+lexTimes7 : List Char -> Nat -> SnocList (Pair Nat Nat) -> Either LexErr (SnocList (Pair Nat Nat))
+
+public export
+lexTimes8 : List Char -> Nat -> Char -> SnocList (Pair Nat Nat) -> Either LexErr (SnocList (Pair Nat Nat))
 
 lexTimes = lexTimes1 . unpack
 
@@ -79,15 +82,21 @@ lexTimes5 str@(c::cs) x1 x0 =
 lexTimes5 [] x1 x0 = Left (cast EOI)
 
 lexTimes6 str@(c::cs) x1 x0 =
-  case (&&) ((<=) c '5') ((<=) '0' c) of
-    True => lexTimes7 cs x1 c x0
-    _    => Left (cast (Unexpected c))
+  case c of
+    ':' => lexTimes7 cs x1 x0
+    _   => Left (cast (Unexpected c))
 lexTimes6 [] x1 x0 = Left (cast EOI)
 
-lexTimes7 str@(c::cs) x2 x1 x0 =
+lexTimes7 str@(c::cs) x1 x0 =
+  case (&&) ((<=) c '5') ((<=) '0' c) of
+    True => lexTimes8 cs x1 c x0
+    _    => Left (cast (Unexpected c))
+lexTimes7 [] x1 x0 = Left (cast EOI)
+
+lexTimes8 str@(c::cs) x2 x1 x0 =
   case (&&) ((<=) c '9') ((<=) '0' c) of
     True => lexTimes2 cs ((:<) x0 (MkPair x2 ((+) ((*) (fromInteger 10) (cast (toDigit x1))) (cast (toDigit c)))))
     _    => Left (cast (Unexpected c))
-lexTimes7 [] x2 x1 x0 = Left (cast EOI)
+lexTimes8 [] x2 x1 x0 = Left (cast EOI)
 
 
