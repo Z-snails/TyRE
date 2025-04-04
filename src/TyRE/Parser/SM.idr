@@ -173,11 +173,11 @@ namespace Stack
   public export
   data Stack : SnocList Type -> Type where
     Lin : Stack [<]
-    (:<) : Stack tps -> {0 t : Type} -> Lazy t -> Stack (tps :< t)
+    (:<) : Stack tps -> {0 t : Type} -> t -> Stack (tps :< t)
 
 record ThreadData (code : SnocList Type) where
   constructor MkThreadData
-  stack : Stack code
+  stack : Lazy (Stack code)
   recorded : SnocList Char
   rec : Bool
 
@@ -185,6 +185,14 @@ record Thread {t : Type} (sm : SM t) where
   constructor MkThread
   state : Maybe sm.s
   tddata : ThreadData (mlookup sm.lookup t state)
+
+%inline
+reducePair : (a -> b -> c) -> Stack (is :< a :< b) -> Stack (is :< c)
+reducePair f (stk :< x :< y) = stk :< f x y
+
+%inline
+transform : (a -> b) -> Stack (is :< a) -> Stack (is :< b)
+transform f (stk :< x) = stk :< f x
 
 execInstructionAux : {0 scs, scs', p : SnocList Type}
                   -> (r : Instruction scs scs')
@@ -194,15 +202,15 @@ execInstructionAux : {0 scs, scs', p : SnocList Type}
 execInstructionAux Record c (MkThreadData st col rec) =
   MkThreadData st col True
 execInstructionAux (Push elem) c (MkThreadData st col rec) =
-  MkThreadData (st :< Delay elem) col rec
+  MkThreadData (Delay (st :< elem)) col rec
 execInstructionAux PushChar (Left c) (MkThreadData st col rec) =
-  MkThreadData (st :< Delay c) col rec
-execInstructionAux (ReducePair f) c (MkThreadData (x :< z :< y) col rec) =
-  MkThreadData (x :< Delay (f (Force z) (Force y))) col rec
-execInstructionAux (Transform f) c (MkThreadData (y :< z) col rec) =
-  MkThreadData (y :< Delay (f (Force z))) col rec
+  MkThreadData (Delay (st :< c)) col rec
+execInstructionAux (ReducePair f) c (MkThreadData stk col rec) =
+  MkThreadData (Delay (reducePair f (Force stk))) col rec
+execInstructionAux (Transform f) c (MkThreadData stk col rec) =
+  MkThreadData (transform f stk) col rec
 execInstructionAux EmitString c (MkThreadData st col rec) =
-  MkThreadData (st :< Delay (fastPack $ cast col)) [<] False
+  MkThreadData (Delay (st :< fastPack (cast col))) [<] False
 
 execRoutineAux : {0 scs, scs', p : SnocList Type}
             -> (r : Routine scs scs')
@@ -236,7 +244,7 @@ execOnThread sm c (MkThread (Just st) info) =
 
 export
 getFromStack : Stack [< t] -> t
-getFromStack ([< r]) = Force r
+getFromStack ([< r]) = r
 
 parameters {0 t : Type} {auto sm : SM t}
   ||| Distinct function for threads

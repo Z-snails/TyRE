@@ -51,7 +51,7 @@ lift2 f (_ ** x) (_ ** y) = (_ ** f x y)
 
 isUnit : HoleRE n -> Bool
 isUnit (HExactly _) = True
-isUnit (HMatch cond) = True
+isUnit (HMatch _) = True
 isUnit Hole = True
 isUnit (HGroup _) = True
 isUnit _ = False

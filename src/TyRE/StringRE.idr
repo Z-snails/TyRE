@@ -115,6 +115,3 @@ r :
     {auto noHoles : fst (toRE str) = 0} ->
     TyRE (Shape (unholeNone (snd $ toRE str) {noHoles}))
 r str = compile $ unholeNone $ snd $ toRE str
-
-foo : TyRE a -> TyRE (List1 (a, a))
-foo x = rh "({}, {})+" [x, x]
