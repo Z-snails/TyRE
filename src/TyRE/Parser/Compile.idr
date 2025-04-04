@@ -416,35 +416,6 @@ getTyREs ds = ds >>= \case
             Nothing => []
     _ => []
 
-checkTerm : TTImp -> Elab ()
-checkTerm t = case doCheck t of
-    Left (fc, msg) => failAt fc msg
-    Right _ => pure ()
-  where
-    doCheck : TTImp -> Either (FC, String) TTImp
-    doCheck t = mapMTTImp (\case
-        ILocal fc _ _ => Left (fc, "Unable to compile terms with local functions. Make these into top level functions")
-        t@(IAlternative _ _ [_]) => Right t
-        t@(IAlternative fc _ _) => Left (fc, "Unable to compile terms using some forms of overloading:\n  - (a, b) syntax for Pair and MkPair\n  - () syntax for Unit and MkUnit")
-        t => Right t) t
-
-checkClause : Clause -> Elab ()
-checkClause (PatClause fc lhs rhs) = checkTerm lhs *> checkTerm rhs
-checkClause (WithClause fc lhs rig wval prf flags cls) = pure ()
-checkClause (ImpossibleClause fc lhs) = checkTerm lhs
-
-checkDecl : Decl -> Elab Decl
-checkDecl d@(IClaim x) = do
-    let MkIClaimData _ _ _ (MkTy _ _ ty) = x.value
-    checkTerm ty
-    pure d
-checkDecl d@(IData fc x mtreq dt) = ?dfhk_1
-checkDecl d@(IDef fc nm cls) = d <$ traverse checkClause cls
-checkDecl d@(IParameters fc params decls) = d <$ assert_total (traverse checkDecl decls)
-checkDecl d@(IRecord fc mstr x mtreq rec) = ?dfhk_4
-checkDecl d@(INamespace fc ns decls) = d <$ assert_total (traverse checkDecl decls)
-checkDecl d = pure d
-
 rewriteDecl : (tmpNS, genNS : Namespace) -> List (Name, TTImp) -> Decl -> Elab Decl
 rewriteDecl tmpNS genNS resTys d@(IClaim x) = do
     let MkIClaimData count vis opts (MkTy fc n ty) = x.value
@@ -498,14 +469,16 @@ createTyREMod n imports ds = do
 
     let resTys = getTyREs ds
 
-    -- ds' <- traverse (rewriteDecl absTmpNS genNS resTys >=> checkDecl) ds
     ds' <- traverse (rewriteDecl absTmpNS genNS resTys) ds
 
     let Just imports = traverse (map (\n => MkImport False n Nothing) . nameAsMod) imports
         | Nothing => fail "Invalid namespace in import list"
     let allImports = map (\n => MkImport False n Nothing) defaultImports ++ imports
 
-    writeIfChanged "TyRE" SourceDir (modIdentAsPath mi) (prettyModule mi allImports ds')
+    let Right src = prettyModule mi allImports ds'
+        | Left err => fail "Could not pretty print module: \{err}"
+
+    writeIfChanged "TyRE" SourceDir (modIdentAsPath mi) src
 
     logMsg "tyre" 5 "Done"
 

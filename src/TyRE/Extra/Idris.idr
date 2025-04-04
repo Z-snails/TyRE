@@ -68,43 +68,46 @@ asApp f acc = (f, acc)
 
 keepArg : Argument -> Bool
 keepArg (Named n (IHole _ n')) = False
-keepArg (Named n x) = not $ isOp n
+keepArg (Named n@(UN _) x) = not $ isOp n
+keepArg (Named _ _) = False
 keepArg _ = True
 
-prettyOpts : List FnOpt -> String -> String
-prettyOpts [] s = s
-prettyOpts (o :: os) s =
-    let o = case o of
-            Inline => "%inline "
-            NoInline => "%noinline "
-            Deprecate => "%deprecate "
-            TCInline => "%tcinline "
-            (Hint normal) => if normal then "%hint " else "%chaser "
-            (GlobalHint normal) => if normal then "%globalhint " else "%defaulthint "
-            ExternFn => "%extern"
-            (ForeignFn ss) => ?dfghjk_7
-            (ForeignExport ss) => ?dfghjk_8
-            Invertible => ?dfghjk_9
-            (Totality treq) => show treq ++ " "
-            Macro => "%macro "
-            (SpecArgs nms) => ?dfghjk_12
-    in o ++ prettyOpts os s
+prettyOpts : List FnOpt -> String -> Either String String
+prettyOpts [] s = pure s
+prettyOpts (o :: os) s = do
+    o <- case o of
+        Inline => pure "%inline "
+        NoInline => pure "%noinline "
+        Deprecate => pure "%deprecate "
+        TCInline => pure "%tcinline "
+        (Hint normal) => pure $ if normal then "%hint " else "%chaser "
+        (GlobalHint normal) => pure $ if normal then "%globalhint " else "%defaulthint "
+        ExternFn => pure "%extern"
+        (ForeignFn ss) => Left "foreign"
+        (ForeignExport ss) => Left "foreign export"
+        Invertible => Left "invertible"
+        (Totality treq) => pure $ show treq ++ " "
+        Macro => pure $ "%macro "
+        (SpecArgs nms) => Left "%spec"
+    (o ++) <$> prettyOpts os s
 
-prettyTm : Pos -> TTImp -> String
-prettyClause : String -> Clause -> String
-prettyDecl : (local : Bool) -> (indent : String) -> Decl -> String
+prettyTm : Pos -> TTImp -> Either String String
+prettyClause : String -> Clause -> Either String String
+prettyDecl : (local : Bool) -> (indent : String) -> Decl -> Either String String
 
-prettyApp : Pos -> TTImp -> String
-prettyApp p t =
+prettyApp : Pos -> TTImp -> Either String String
+prettyApp p t = do
     let (f, xs) = asApp t []
-        xs = filter keepArg xs
-    in showParens (p > Fun) $ showSep " " $ prettyTm Fun f :: map prettyArgument xs
+    let xs = filter keepArg xs
+    f' <- prettyTm Fun f
+    xs' <- traverse prettyArgument xs
+    pure $ showParens (p > Fun) $ showSep " " (f' :: xs')
   where
-    prettyArgument : Argument -> String
+    prettyArgument : Argument -> Either String String
     prettyArgument (Positional s) = prettyTm Arg s
-    prettyArgument (Named nm s) = "{\{showName nm} = \{prettyTm Open s}}"
-    prettyArgument (Auto s) = "@{\{prettyTm Open s}}"
-    prettyArgument (With s) = ?with_app
+    prettyArgument (Named nm s) = pure "{\{showName nm} = \{!(prettyTm Open s)}}"
+    prettyArgument (Auto s) = pure "@{\{!(prettyTm Open s)}}"
+    prettyArgument (With s) = Left "with application"
 
 isPair : TTImp -> Maybe (TTImp, TTImp)
 isPair (IApp _ (IApp _ (IVar _ `{Pair}) x) y) = Just (x, y)
@@ -114,11 +117,11 @@ isMkPair : TTImp -> Maybe (TTImp, TTImp)
 isMkPair (IApp _ (IApp _ (IVar _ `{MkPair}) x) y) = Just (x, y)
 isMkPair _ = Nothing
 
-tryPair : TTImp -> TTImp -> Maybe String
+tryPair : TTImp -> TTImp -> Maybe (Either String String)
 tryPair x y = do
     (x, y) <- isPair x <* isMkPair y
         <|> isMkPair x <* isPair y
-    Just "(\{prettyTm Open x}, \{prettyTm Open y})"
+    Just $ (\x, y => "(\{x}, \{y})") <$> prettyTm Open x <*> prettyTm Open y
 
 isUnit : TTImp -> Bool
 isUnit (IVar _ `{Unit}) = True
@@ -128,92 +131,101 @@ isMkUnit : TTImp -> Bool
 isMkUnit (IVar _ `{MkUnit}) = True
 isMkUnit _ = False
 
-tryUnit : TTImp -> TTImp -> Maybe String
+tryUnit : TTImp -> TTImp -> Maybe (Either String String)
 tryUnit x y = if (isUnit x && isMkUnit y) || (isMkUnit x && isUnit y)
-    then Just "()"
+    then Just (Right "()")
     else Nothing
 
-prettyAlternative : List TTImp -> Maybe String
-prettyAlternative [x, y] = tryPair x y <|> tryUnit x y
-prettyAlternative _ = Nothing
+prettyAlternative : List TTImp -> Either String String
+prettyAlternative [x, y] = case the _ (tryPair x y <|> tryUnit x y) of
+    Nothing => Left "alternative (overloading)"
+    Just (Left e) => Left e
+    Just (Right x) => Right x
+prettyAlternative _ = Left "alternative"
 
-prettyTm p (IVar fc nm) = showName nm
-prettyTm p (IPi fc rig pinfo mnm argTy retTy) =
+prettyTm p (IVar fc nm) = pure $ showName nm
+prettyTm p (IPi fc rig pinfo mnm argTy retTy) = do
     let n = maybe "_" showName mnm
-    in showParens (p > Fun) $ case pinfo of
-        ImplicitArg => "{\{showCount rig n} : \{prettyTm Open argTy}} -> \{prettyTm Fun retTy}"
-        ExplicitArg => "(\{showCount rig n} : \{prettyTm Open argTy}) -> \{prettyTm Fun retTy}"
-        AutoImplicit => "{auto \{showCount rig n} : \{prettyTm Open argTy} -> \{prettyTm Fun retTy}"
-        (DefImplicit x) => "{default \{prettyTm Arg x} \{showCount rig n} : \{prettyTm Open argTy} -> \{prettyTm Fun retTy}"
-prettyTm p (ILam fc rig pinfo mnm argTy scope) =
+    argTy <- prettyTm Open argTy
+    retTy <- prettyTm Open retTy
+    showParens (p > Fun) <$> case pinfo of
+        ImplicitArg => pure "{\{showCount rig n} : \{argTy}} -> \{retTy}"
+        ExplicitArg => pure "(\{showCount rig n} : \{argTy}) -> \{retTy}"
+        AutoImplicit => pure "{auto \{showCount rig n} : \{argTy}} -> \{retTy}"
+        (DefImplicit x) => do
+            x <- prettyTm Arg x
+            pure $ "{default \{x} \{showCount rig n} : \{argTy}} -> \{retTy}"
+prettyTm p (ILam fc rig pinfo mnm argTy scope) = do
     let n = maybe "_" showName mnm
-    in showParens (p > Open) "\\ \{n} => \{prettyTm Open scope}"
-prettyTm p (ILet fc lhsFC rig nm nTy nVal scope) =
-    showParens (p > Open)
-        "let \{showCount rig $ showName nm} : \{prettyTm Open nTy} := \{prettyTm Open nVal} in \{prettyTm Open scope}"
-prettyTm p (ICase fc xs s ty cls) =
-    let cls = showSep " ; " $ map (prettyClause "=>") cls
-        scr = prettyTm Open s
-        -- scr = if isImplicit ty
-        --     then prettyTm Open s
-        --     else "the \{prettyTm Arg ty} \{prettyTm Arg s}"
-    in showParens (p > Open) "case \{scr} of { \{cls} }"
-prettyTm p (ILocal fc decls s) =
-    let bind = showSep "; " $ map (prettyDecl True "") decls
-    in "let \{bind} in \{prettyTm Open s}"
-prettyTm p (IUpdate fc upds s) = ?dfghkj_6
+    scope <- prettyTm Open scope
+    pure $ showParens (p > Open) "\\ \{n} => \{scope}"
+prettyTm p (ILet fc lhsFC rig nm nTy nVal scope) = do
+    nTy <- prettyTm Open nTy
+    nVal <- prettyTm Open nVal
+    scope <- prettyTm Open scope
+    pure $ showParens (p > Open)
+        "let \{showCount rig $ showName nm} : \{nTy} := \{nVal} in \{scope}"
+prettyTm p (ICase fc xs s ty cls) = do
+    cls <- showSep " ; " <$> traverse (prettyClause "=>") cls
+    scr <- prettyTm Open s
+    pure $ showParens (p > Open) "case \{scr} of { \{cls} }"
+prettyTm p (ILocal fc decls s) = do
+    bind <- showSep "; " <$> traverse (prettyDecl True "") decls
+    pure $ "let \{bind} in \{!(prettyTm Open s)}"
+prettyTm p (IUpdate fc upds s) = Left "record update"
 prettyTm p t@(IApp _ _ _) = prettyApp p t
 prettyTm p t@(INamedApp _ _ _ _) = prettyApp p t
 prettyTm p t@(IAutoApp _ _ _) = prettyApp p t
 prettyTm p t@(IWithApp _ _ _) = prettyApp p t
-prettyTm p (ISearch fc depth) = "%search"
+prettyTm p (ISearch fc depth) = pure "%search"
 prettyTm p (IAlternative fc x [s]) = prettyTm p s
-prettyTm p (IAlternative fc x ss) = case prettyAlternative ss of
-    Just s => s
-    Nothing => ?alternative_not_supported
-prettyTm p (IRewrite fc s t) = ?dfghkj_13
-prettyTm p (IBindHere fc bm s) = ?dfghkj_14
-prettyTm p (IBindVar fc str) = str
-prettyTm p (IAs fc nameFC side nm s) = ?dfghkj_16
-prettyTm p (IMustUnify fc dr s) = ?dfghkj_17
-prettyTm p (IDelayed fc LInf s) = showParens (p > Fun) "Inf \{prettyTm Arg s}"
-prettyTm p (IDelayed fc LLazy s) = showParens (p > Fun) "Lazy \{prettyTm Arg s}"
+prettyTm p (IAlternative fc x ss) = prettyAlternative ss
+prettyTm p (IRewrite fc s t) = pure $ showParens (p > Open) $ "rewrite \{!(prettyTm Open s)} in \{!(prettyTm Open t)}"
+prettyTm p (IBindHere fc bm s) = Left "IBindHere"
+prettyTm p (IBindVar fc str) = pure str
+prettyTm p (IAs fc nameFC side nm s) = Left "@ patterns"
+prettyTm p (IMustUnify fc dr s) = Left "dotted patterns"
+prettyTm p (IDelayed fc LInf s) = pure $ showParens (p > Fun) "Inf \{!(prettyTm Arg s)}"
+prettyTm p (IDelayed fc LLazy s) = pure $ showParens (p > Fun) "Lazy \{!(prettyTm Arg s)}"
 prettyTm p (IDelayed fc LUnknown s) = assert_total $ idris_crash "Unexpected LUnknown"
-prettyTm p (IDelay fc s) = showParens (p > Fun) "Delay \{prettyTm Arg s}"
-prettyTm p (IForce fc s) = showParens (p > Fun) "Force \{prettyTm Arg s}"
-prettyTm p (IQuote fc s) = ?dfghkj_21
-prettyTm p (IQuoteName fc nm) = ?dfghkj_22
-prettyTm p (IQuoteDecl fc decls) = ?dfghkj_23
-prettyTm p (IUnquote fc s) = ?dfghkj_24
-prettyTm p (IPrimVal fc c) = show c
-prettyTm p (IType fc) = "Type"
-prettyTm p (IHole fc str) = "?\{str}"
-prettyTm p (Implicit fc bindIfUnsolved) = "_"
-prettyTm p (IWithUnambigNames fc xs s) = ?dfghkj_29
+prettyTm p (IDelay fc s) = pure $ showParens (p > Fun) "Delay \{!(prettyTm Arg s)}"
+prettyTm p (IForce fc s) = pure $ showParens (p > Fun) "Force \{!(prettyTm Arg s)}"
+prettyTm p (IQuote fc s) = Left "quotes"
+prettyTm p (IQuoteName fc nm) = Left "quotes"
+prettyTm p (IQuoteDecl fc decls) = Left "quotes"
+prettyTm p (IUnquote fc s) = Left "unquotes"
+prettyTm p (IPrimVal fc c) = pure $ show c
+prettyTm p (IType fc) = pure "Type"
+prettyTm p (IHole fc str) = pure "?\{str}"
+prettyTm p (Implicit fc True) = pure "_"
+prettyTm p (Implicit fc False) = pure "?"
+prettyTm p (IWithUnambigNames fc xs s) = Left "with disambiguation"
 
-prettyClause op (PatClause fc lhs rhs) = "\{prettyTm Open lhs} \{op} \{prettyTm Open rhs}"
-prettyClause op (WithClause fc lhs rig wval prf flags cls) = ?with_clause
-prettyClause op (ImpossibleClause fc lhs) = "\{prettyTm Open lhs} impossible"
+prettyClause op (PatClause fc lhs rhs) = pure "\{!(prettyTm Open lhs)} \{op} \{!(prettyTm Open rhs)}"
+prettyClause op (WithClause fc lhs rig wval prf flags cls) = Left "with clause"
+prettyClause op (ImpossibleClause fc lhs) = pure "\{!(prettyTm Open lhs)} impossible"
 
-prettyDecl local ind (IClaim x) =
+prettyDecl local ind (IClaim x) = do
     let MkIClaimData count vis opts (MkTy _ n ty) = x.value
-        decl = showCount count $ prettyOpts opts $ "\{ind}\{showName n.value} : \{prettyTm Open ty}"
-        fc = if not local && isEmptyFC x.fc then "" else "\{ind}-- \{show x.fc}\n"
-    in "\{fc}\{show vis} \{decl}"
-prettyDecl local ind (IData fc x mtreq dt) = ?rhs_1
-prettyDecl local ind (IDef fc nm cls) = concat $ map (\c => prettyClause "=" c ++ "\n") cls
-prettyDecl local ind (IParameters fc params decls) = ?rhs_3
-prettyDecl local ind (IRecord fc mstr x mtreq rec) = ?rhs_4
-prettyDecl local ind (INamespace fc ns decls) =
-    let ds = showSep "\n" $ map (prettyDecl local (ind ++ "  ")) decls
-    in "\{ind}namespace \{show ns}\n\{ds}"
-prettyDecl local ind (ITransform fc nm s t) = ?rhs_6
-prettyDecl local ind (IRunElabDecl fc s) = ?rhs_7
-prettyDecl local ind (ILog x) = ?rhs_8
-prettyDecl local ind (IBuiltin fc bty nm) = ?rhs_9
+    ty <- prettyTm Open ty
+    let decl = showCount count $ !(prettyOpts opts "\{ind}\{showName n.value} : \{ty}")
+    let fc = if not local && isEmptyFC x.fc then "" else "\{ind}-- \{show x.fc}\n"
+    pure "\{fc}\{show vis} \{decl}"
+prettyDecl local ind (IData fc x mtreq dt) = Left "data"
+prettyDecl local ind (IDef fc nm cls) = concat <$> traverse (\c => (++ "\n") <$> prettyClause "=" c) cls
+prettyDecl local ind (IParameters fc params decls) = Left "parameters"
+prettyDecl local ind (IRecord fc mstr x mtreq rec) = Left "record"
+prettyDecl local ind (INamespace fc ns decls) = do
+    ds <- showSep "\n" <$> traverse (prettyDecl local (ind ++ "  ")) decls
+    pure "\{ind}namespace \{show ns}\n\{ds}"
+prettyDecl local ind (ITransform fc nm s t) = Left "%transform"
+prettyDecl local ind (IRunElabDecl fc s) = Left "%runElab"
+prettyDecl local ind (ILog x) = Left "%logging"
+prettyDecl local ind (IBuiltin fc bty nm) = Left "%builtin"
 
-prettyDecls : List Decl -> String
-prettyDecls ds = showSep "\n" $ map (prettyDecl False "") ds
+export
+prettyDecls : List Decl -> Either String String
+prettyDecls ds = showSep "\n" <$> traverse (prettyDecl False "") ds
 
 public export
 record Import where
@@ -235,9 +247,9 @@ prettyModule :
     (mod : ModuleIdent) ->
     (imports : List Import) ->
     (decls : List Decl) ->
-    String
-prettyModule mod imports decls = unlines
+    Either String String
+prettyModule mod imports decls = pure $ unlines
     [ "module \{show mod}"
     , concat $ map prettyImport imports
-    , prettyDecls decls
+    , !(prettyDecls decls)
     ]
