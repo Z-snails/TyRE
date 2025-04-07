@@ -35,5 +35,5 @@ genTimeInput k _ = concat (List.replicate ((*) k (fromInteger 100)) (unpack (fro
 
 -- Staging.Regexes:47:4--48:38
 export stagingBenchmarks : List Benchmark
-stagingBenchmarks = (::) (MkBench (fromString "staging.rep_a_interp") genAInput ((.) pure (parseFull repA))) ((::) (MkBench (fromString "staging.rep_a_ilex") genAInput ((.) pure lexRepA1)) ((::) (MkBench (fromString "staging.time_interp") genTimeInput ((.) pure (parseFull time))) ((::) (MkBench (fromString "staging.time_ilex") genTimeInput ((.) pure lexTimes1)) Nil)))
+stagingBenchmarks = (::) (MkBench (fromString "staging.rep_a_interp") genAInput ((.) pure (parseFull repA))) ((::) (MkBench (fromString "staging.rep_a_compile") genAInput ((.) pure (parseFull repA'))) ((::) (MkBench (fromString "staging.rep_a_ilex") genAInput ((.) pure lexRepA1)) ((::) (MkBench (fromString "staging.time_interp") genTimeInput ((.) pure (parseFull time))) ((::) (MkBench (fromString "staging.time_compile") genTimeInput ((.) pure (parseFull time'))) ((::) (MkBench (fromString "staging.time_ilex") genTimeInput ((.) pure lexTimes1)) Nil)))))
 

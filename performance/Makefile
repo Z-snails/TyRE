@@ -15,3 +15,8 @@ run:
 .PHONY: graph
 graph:
 	python3 graph_csv.py
+
+.PHONY: exe
+exe: build
+	cp build/exec/bench_app/bench.ss build/exec/bench_app/libidris2_support.so build/
+	compile-chez-program --optimize-level 3 build/bench.ss

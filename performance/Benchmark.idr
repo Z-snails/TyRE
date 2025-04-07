@@ -13,10 +13,16 @@ record Benchmark where
     run : input -> IO output
 
 %foreign "scheme:collect"
-prim__gc : PrimIO ()
+prim__collect : PrimIO ()
 
-gc : IO ()
-gc = primIO $ prim__gc
+collect : IO ()
+collect = primIO $ prim__collect
+
+%foreign "scheme:collect-request-handler void"
+prim__disable_gc : PrimIO ()
+
+disable_gc : IO ()
+disable_gc = primIO $ prim__disable_gc
 
 record Stats where
     constructor MkStats
@@ -34,10 +40,10 @@ parameters
     getTimes : Nat -> bench.input -> List (Clock Duration) -> IO (List (Clock Duration))
     getTimes Z inp acc = pure acc
     getTimes (S k) inp acc = do
+        collect
         start <- clockTime Monotonic
         _ <- bench.run inp
         end <- clockTime Monotonic
-        when (cast {to = Integer} k `mod` 10 == 0) gc -- Try to avoid garbage collection during a test
         getTimes k inp (timeDifference end start :: acc)
 
     getStats : List (Clock Duration) -> Stats
@@ -56,12 +62,13 @@ parameters
 
     export
     time : IO ()
-    time = go [0..max] Nothing
+    time = disable_gc >> go [0..max] Nothing
       where
         go : List Nat -> Maybe bench.input -> IO ()
         go [] _ = pure ()
         go (size :: ss) inp = do
             let inp' = bench.genInput size inp
+            _ <- getTimes 5 inp' [] -- Warmup - these seems to avoid the big spikes
             ts <- getTimes samples inp' []
             let stats = getStats ts
             putStrLn "\{bench.name},\{show size},\{show stats.mean},\{show stats.stddev}"
