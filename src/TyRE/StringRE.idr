@@ -98,7 +98,7 @@ fromRight (Left x) {isRight = ItIsRight} impossible
 
 public export
 toRE : (str : String) -> {auto 0 isRight : IsRight (rAux str)} -> SomeHoleRE
-toRE str {isRight} = fromRight (rAux str) @{isRight}
+toRE str {isRight} = StringRE.fromRight (rAux str) @{isRight}
 
 public export
 rh :
